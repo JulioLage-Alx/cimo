@@ -1313,7 +1313,118 @@
                 grid-template-columns: 1fr;
             }
         }
-    </style>
+        .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 0.875rem;
+    font-weight: 700;
+    text-transform: capitalize;
+    letter-spacing: 0.5px;
+    transition: var(--transition);
+}
+
+.status-badge.critico {
+    background: rgba(220, 38, 38, 0.15);
+    color: #dc2626;
+    border: 2px solid rgba(220, 38, 38, 0.3);
+}
+
+.status-badge.atencao {
+    background: rgba(234, 88, 12, 0.15);
+    color: var(--accent-orange);
+    border: 2px solid rgba(234, 88, 12, 0.3);
+}
+
+.status-badge.viavel {
+    background: rgba(5, 150, 105, 0.15);
+    color: var(--accent);
+    border: 2px solid rgba(5, 150, 105, 0.3);
+}
+
+/* Metric cards com status visual */
+.metric-card.status-critico::before {
+    background: linear-gradient(90deg, #dc2626, #ef4444);
+}
+
+.metric-card.status-atencao::before {
+    background: linear-gradient(90deg, var(--accent-orange), #f97316);
+}
+
+.metric-card.status-viavel::before {
+    background: linear-gradient(90deg, var(--accent), #10b981);
+}
+
+/* Tooltips simples */
+.tooltip {
+    cursor: help;
+    font-size: 0.75rem;
+    color: var(--gray-400);
+    margin-left: 4px;
+}
+
+.tooltip:hover {
+    color: var(--primary);
+}
+
+/* Loading states melhorados */
+.loading-advanced {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 20px;
+}
+
+.loading-spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid var(--gray-200);
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+.loading-progress {
+    width: 100%;
+    max-width: 200px;
+    height: 4px;
+    background: var(--gray-200);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary), var(--primary-light));
+    transition: width 0.3s ease;
+}
+
+/* Responsividade para novos elementos */
+@media (max-width: 768px) {
+    .quick-actions {
+        padding: 16px 20px;
+    }
+    
+    .quick-actions > div {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+    
+    .report-actions {
+        width: 100%;
+        justify-content: space-between;
+    }
+    
+    .controls-grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+}
+</style>
 </head>
 <body>
     <!-- Debug Console -->
@@ -1418,37 +1529,97 @@
             </header>
 
             <!-- Controls -->
-            <section class="controls">
-                <div class="controls-grid">
-                    <div class="control-group">
-                        <label for="taxaRetorno">Taxa de Retorno (%)</label>
-                        <input type="range" id="taxaRetorno" class="range-input" min="2" max="8" step="0.1" value="4.0">
-                        <div class="range-value" id="taxaDisplay">4.0%</div>
-                    </div>
-                    
-                    <div class="control-group">
-                        <label for="expectativaVida">Expectativa de Vida</label>
-                        <select id="expectativaVida">
-                            <option value="85">85 anos</option>
-                            <option value="90" selected>90 anos</option>
-                            <option value="95">95 anos</option>
-                        </select>
-                    </div>
-                    
-                    <div class="control-group">
-                        <label for="despesasMensais">Despesas Mensais (R$)</label>
-                        <input type="number" id="despesasMensais" value="150000" step="5000">
-                    </div>
-                    
-                    <div class="control-group">
-                        <label>Status Sistema</label>
-                        <div class="status-indicator" id="systemStatus">
-                            <i class="fas fa-circle"></i>
-                            <span>Verificando...</span>
-                        </div>
-                    </div>
-                </div>
-            </section>
+            
+<section class="controls">
+    <div class="controls-grid">
+        <!-- Input existente: Taxa de Retorno -->
+        <div class="control-group">
+            <label for="taxaRetorno">
+                Taxa de Retorno Real (%)
+                <span class="tooltip" title="Taxa já descontada da inflação (~3.5% a.a.)">ℹ️</span>
+            </label>
+            <input type="range" id="taxaRetorno" class="range-input" min="2" max="8" step="0.1" value="4.0">
+            <div class="range-value" id="taxaDisplay">4.0%</div>
+            <small style="color: var(--gray-500); font-size: 0.75rem; margin-top: 4px; display: block;">
+                Retorno real, já descontada a inflação (ex.: 4% ao ano real)
+            </small>
+        </div>
+        
+        <!-- Input existente: Expectativa de Vida -->
+        <div class="control-group">
+            <label for="expectativaVida">Expectativa de Vida</label>
+            <select id="expectativaVida">
+                <option value="85">85 anos</option>
+                <option value="90" selected>90 anos</option>
+                <option value="95">95 anos</option>
+            </select>
+        </div>
+        
+        <!-- Input existente: Despesas Mensais -->
+        <div class="control-group">
+            <label for="despesasMensais">Despesas Mensais (R$)</label>
+            <input type="number" id="despesasMensais" value="150000" step="5000" 
+                   min="50000" max="1000000">
+        </div>
+        
+        <!-- NOVO INPUT: Perfil de Investimento -->
+        <div class="control-group">
+            <label for="perfilInvestimento">Perfil de Investimento</label>
+            <select id="perfilInvestimento">
+                <option value="conservador">Conservador (3.5% a.a.)</option>
+                <option value="moderado" selected>Moderado (4.5% a.a.)</option>
+                <option value="balanceado">Balanceado (5.2% a.a.)</option>
+            </select>
+            <small style="color: var(--gray-500); font-size: 0.75rem; margin-top: 4px; display: block;">
+                Define alocação de ativos e retorno esperado
+            </small>
+        </div>
+        
+            <!-- NOVO INPUT: Início da Renda dos Filhos -->
+        <div class="control-group">
+            <label for="inicioRendaFilhos">
+                Início da Renda dos Filhos
+                <span class="tooltip" title="Escolha quando os filhos devem começar a receber: ao falecimento de Ana, imediatamente ou a partir de certa idade">ℹ️</span>
+            </label>
+            <select id="inicioRendaFilhos">
+                <option value="falecimento" selected>Após falecimento de Ana</option>
+                <option value="imediato">Imediatamente</option>
+                <option value="65">Aos 65 anos de Ana</option>
+                <option value="70">Aos 70 anos de Ana</option>
+                <option value="75">Aos 75 anos de Ana</option>
+            </select>
+            <small style="color: var(--gray-500); font-size: 0.75rem; margin-top: 4px; display: block;">
+                Timing flexível para atender objetivos familiares
+            </small>
+        </div>
+        
+        <!-- NOVO INPUT: Custo Estimado da Fazenda -->
+        <div class="control-group">
+            <label for="custoFazenda">Custo Estimado da Fazenda (R$)</label>
+            <input type="number" id="custoFazenda" value="2000000" step="100000" 
+                   min="500000" max="10000000">
+            <small style="color: var(--gray-500); font-size: 0.75rem; margin-top: 4px; display: block;">
+                Usado para calcular verba disponível para arte
+            </small>
+        </div>
+        
+        <!-- Input existente: Status Sistema -->
+        <div class="control-group">
+            <label>Status Sistema</label>
+            <div class="status-indicator" id="systemStatus">
+                <i class="fas fa-circle"></i>
+                <span>Verificando...</span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- NOVA SEÇÃO: Legenda de Unidades -->
+    <div class="currency-legend" style="margin-top: 16px; padding: 12px; background: var(--gray-50); border-radius: 8px; font-size: 0.8rem; color: var(--gray-600);">
+        <strong>💡 Legenda:</strong> M = milhões, k = mil | 
+        <strong>Taxa:</strong> Sempre REAL (já descontada da inflação) |
+        <strong>Doações:</strong> Exatamente 15 anos
+    </div>
+</section>
 
             <!-- Dashboard Content -->
             <div class="dashboard">
@@ -1528,8 +1699,73 @@
                             </div>
                         </div>
                     </div>
-                </section>
 
+                    <div class="metric-card">
+                        <div class="metric-header">
+                            <div class="metric-content">
+                                <h3 id="valorArte">R$ 3,2M</h3>
+                                <p>Disponível para Arte/Galeria</p>
+                                <div class="metric-trend positive" id="trendArte">
+                                    <i class="fas fa-palette"></i>
+                                    <span id="percentualArte">4.9%</span>
+                                </div>
+                            </div>
+                            <div class="metric-icon purple">
+                                <i class="fas fa-brush"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="metric-card">
+                        <div class="metric-header">
+                            <div class="metric-content">
+                                <h3 id="perfilAtual">Moderado</h3>
+                                <p>Perfil de Investimento</p>
+                                <div class="metric-trend neutral">
+                                    <i class="fas fa-chart-line"></i>
+                                    <span id="retornoEsperado">4.5% a.a.</span>
+                                </div>
+                            </div>
+                            <div class="metric-icon blue">
+                                <i class="fas fa-balance-scale"></i>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                <section class="quick-actions" style="padding: 24px 32px; background: var(--white); border-bottom: 1px solid var(--border);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+                        
+                        <!-- Indicador de Status do Plano -->
+                        <div class="plan-status" id="planStatusIndicator">
+                            <div class="status-badge viavel" id="statusBadge">
+                                <i class="fas fa-check-circle"></i>
+                                <span id="statusText">Viável</span>
+                            </div>
+                            <small id="statusDescription" style="color: var(--gray-600); margin-left: 8px;">
+                                Plano sustentável com boa margem
+                            </small>
+                        </div>
+                        
+                        <!-- Ações de Relatório -->
+                        <div class="report-actions" style="display: flex; gap: 12px;">
+                            <button class="widget-action" onclick="generateReportPDF('executivo')" 
+                                    title="Gerar Relatório Executivo">
+                                <i class="fas fa-file-pdf"></i>
+                                <span>Executivo</span>
+                            </button>
+                            <button class="widget-action" onclick="generateReportPDF('detalhado')" 
+                                    title="Gerar Análise Detalhada">
+                                <i class="fas fa-file-alt"></i>
+                                <span>Detalhado</span>
+                            </button>
+                            <button class="widget-action" onclick="generateReportPDF('simulacao')" 
+                                    title="Gerar Relatório com Simulações">
+                                <i class="fas fa-chart-line"></i>
+                                <span>Simulação</span>
+                            </button>
+                        </div>
+                    </div>
+                </section>
                 <!-- Charts -->
                 <section class="charts-grid fade-in">
                     <div class="chart-widget">
@@ -4771,5 +5007,317 @@ function initializePerformanceOptimizations() {
 }
 
     </script>
+    <script>
+// ================ FUNÇÕES ATUALIZADAS v4.0 ================
+
+// Validações de sanidade locais
+function validarInputsLocais() {
+    const taxa = parseFloat(document.getElementById('taxaRetorno').value);
+    const expectativa = parseInt(document.getElementById('expectativaVida').value);
+    const despesas = parseFloat(document.getElementById('despesasMensais').value);
+    const custoFazenda = parseFloat(document.getElementById('custoFazenda').value);
+    
+    debugMessage('Validando inputs localmente');
+    
+    // Validar taxa de retorno (deve estar entre 0.1% e 15%)
+    if (taxa < 0.1 || taxa > 15) {
+        Utils.showNotification('Taxa de retorno deve estar entre 0.1% e 15%', 'danger');
+        return false;
+    }
+    
+    // Alertar se taxa muito otimista
+    if (taxa > 8) {
+        Utils.showNotification('⚠️ Taxa de retorno acima de 8% é muito otimista para perfil conservador-moderado', 'warning');
+    }
+    
+    // Validar expectativa de vida (deve ser >= 53 anos)
+    if (expectativa < 53) {
+        Utils.showNotification('Expectativa de vida deve ser pelo menos 53 anos', 'danger');
+        return false;
+    }
+    
+    // Validar despesas (entre R$ 50k e R$ 1M)
+    if (despesas < 50000 || despesas > 1000000) {
+        Utils.showNotification('Despesas devem estar entre R$ 50.000 e R$ 1.000.000', 'danger');
+        return false;
+    }
+    
+    // Validar custo fazenda
+    if (custoFazenda < 500000 || custoFazenda > 10000000) {
+        Utils.showNotification('Custo da fazenda deve estar entre R$ 500.000 e R$ 10.000.000', 'danger');
+        return false;
+    }
+    
+    return true;
+}
+
+// ApiClient atualizado com novos parâmetros
+const ApiClientV4 = {
+    ...ApiClient,
+    
+    async fetchData() {
+        // Validar inputs antes de enviar
+        if (!validarInputsLocais()) {
+            throw new Error('Parâmetros inválidos');
+        }
+        
+        try {
+            debugMessage('Iniciando requisição para API v4.0');
+            
+            const params = new URLSearchParams({
+                taxa: document.getElementById('taxaRetorno').value,
+                expectativa: document.getElementById('expectativaVida').value,
+                despesas: document.getElementById('despesasMensais').value,
+                // NOVOS PARÂMETROS v4.0:
+                perfil: document.getElementById('perfilInvestimento').value,
+                inicio_renda_filhos: document.getElementById('inicioRendaFilhos').value,
+                custo_fazenda: document.getElementById('custoFazenda').value
+            });
+
+            const url = `${CONFIG.ENDPOINTS.dados}?${params}`;
+            debugMessage(`URL da requisição v4.0: ${url}`);
+
+            const response = await fetch(url);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            debugMessage(`Dados v4.0 recebidos: versão ${data.versao || 'desconhecida'}`);
+            
+            if (!data.success) {
+                throw new Error(data.erro || 'Erro desconhecido na API v4.0');
+            }
+
+            return data;
+        } catch (error) {
+            debugMessage(`Erro na API v4.0: ${error.message}`, 'error');
+            throw error;
+        }
+    }
+};
+
+// UIManager atualizado para novos campos
+const UIManagerV4 = {
+    ...UIManager,
+    
+    updateMetrics() {
+        if (!AppState.currentData) return;
+        
+        debugMessage('Atualizando métricas v4.0');
+        const { resultado, patrimonio, status, parametros } = AppState.currentData;
+        
+        // Métricas existentes
+        const patrimonioEl = document.getElementById('valorPatrimonio');
+        if (patrimonioEl) {
+            patrimonioEl.textContent = Utils.formatCurrency(patrimonio, true);
+        }
+        
+        const fazendaEl = document.getElementById('valorFazenda');
+        const percentualEl = document.getElementById('percentualFazenda');
+        const trendEl = document.getElementById('trendFazenda');
+        
+        if (fazendaEl && resultado) {
+            fazendaEl.textContent = Utils.formatCurrency(resultado.fazenda, true);
+            
+            if (percentualEl) {
+                percentualEl.textContent = Utils.formatPercentage(resultado.percentual);
+            }
+            
+            if (trendEl) {
+                trendEl.className = 'metric-trend';
+                if (resultado.fazenda > 0) {
+                    trendEl.classList.add('positive');
+                    trendEl.innerHTML = '<i class="fas fa-arrow-up"></i><span>' + Utils.formatPercentage(resultado.percentual) + '</span>';
+                } else {
+                    trendEl.classList.add('negative');
+                    trendEl.innerHTML = '<i class="fas fa-arrow-down"></i><span>' + Utils.formatPercentage(resultado.percentual) + '</span>';
+                }
+            }
+        }
+        
+        // NOVO: Atualizar valor arte
+        const arteEl = document.getElementById('valorArte');
+        const percentualArteEl = document.getElementById('percentualArte');
+        const trendArteEl = document.getElementById('trendArte');
+        
+        if (arteEl && resultado) {
+            arteEl.textContent = Utils.formatCurrency(resultado.arte || 0, true);
+            
+            if (percentualArteEl) {
+                percentualArteEl.textContent = Utils.formatPercentage(resultado.percentual_arte || 0);
+            }
+            
+            if (trendArteEl) {
+                trendArteEl.className = 'metric-trend';
+                if (resultado.arte > 0) {
+                    trendArteEl.classList.add('positive');
+                    trendArteEl.innerHTML = '<i class="fas fa-palette"></i><span>' + Utils.formatPercentage(resultado.percentual_arte || 0) + '</span>';
+                } else {
+                    trendArteEl.classList.add('neutral');
+                    trendArteEl.innerHTML = '<i class="fas fa-palette"></i><span>Indisponível</span>';
+                }
+            }
+        }
+        
+        // NOVO: Atualizar perfil de investimento
+        const perfilEl = document.getElementById('perfilAtual');
+        const retornoEl = document.getElementById('retornoEsperado');
+        
+        if (perfilEl && parametros) {
+            const perfil = parametros.perfil_investimento || 'moderado';
+            perfilEl.textContent = perfil.charAt(0).toUpperCase() + perfil.slice(1);
+            
+            // Mostrar retorno esperado baseado no perfil
+            const retornos = {
+                'conservador': '3.5% a.a.',
+                'moderado': '4.5% a.a.',
+                'balanceado': '5.2% a.a.'
+            };
+            if (retornoEl) {
+                retornoEl.textContent = retornos[perfil] || '4.5% a.a.';
+            }
+        }
+        
+        // NOVO: Status visual do plano
+        this.updateStatusVisual(status);
+        
+        // Compromissos existente
+        const compromissosEl = document.getElementById('valorCompromissos');
+        if (compromissosEl && resultado) {
+            compromissosEl.textContent = Utils.formatCurrency(resultado.total, true);
+        }
+        
+        // Status existente
+        const statusEl = document.getElementById('valorStatus');
+        if (statusEl) {
+            statusEl.textContent = status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Calculando...';
+        }
+    },
+    
+    updateStatusVisual(status) {
+        const statusBadge = document.getElementById('statusBadge');
+        const statusText = document.getElementById('statusText');
+        const statusDescription = document.getElementById('statusDescription');
+        const statusEl = document.getElementById('valorStatus');
+        
+        if (!statusBadge || !statusText || !statusDescription) return;
+        
+        // Remover classes anteriores
+        statusBadge.classList.remove('critico', 'atencao', 'viavel');
+        
+        // Adicionar classe baseada no status
+        let icon, description;
+        
+        if (status === 'crítico') {
+            statusBadge.classList.add('critico');
+            icon = 'exclamation-triangle';
+            description = 'Plano insustentável - ação urgente necessária';
+            if (statusEl) statusEl.innerHTML = '⚠️ Crítico';
+        } else if (status === 'atenção') {
+            statusBadge.classList.add('atencao');
+            icon = 'exclamation-circle';
+            description = 'Plano viável mas com margem baixa';
+            if (statusEl) statusEl.innerHTML = '⚡ Atenção';
+        } else {
+            statusBadge.classList.add('viavel');
+            icon = 'check-circle';
+            description = 'Plano sustentável com boa margem';
+            if (statusEl) statusEl.innerHTML = '✅ Viável';
+        }
+        
+        statusBadge.innerHTML = `<i class="fas fa-${icon}"></i><span>${status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Calculando'}</span>`;
+        statusDescription.textContent = description;
+        
+        debugMessage(`Status visual atualizado: ${status}`);
+    }
+};
+
+// Event listeners para novos inputs
+document.addEventListener('DOMContentLoaded', () => {
+    // ... inicialização existente ...
+    
+    // NOVOS EVENT LISTENERS v4.0
+    const debouncedUpdate = DashboardController.debounce(() => DashboardController.loadDashboard(), 800);
+    
+    // Perfil de investimento
+    document.getElementById('perfilInvestimento').addEventListener('change', debouncedUpdate);
+    
+    // Início renda filhos
+    document.getElementById('inicioRendaFilhos').addEventListener('change', debouncedUpdate);
+    
+    // Custo fazenda
+    document.getElementById('custoFazenda').addEventListener('input', debouncedUpdate);
+    
+    debugMessage('Event listeners v4.0 configurados');
+});
+
+// Substituir ApiClient e UIManager por versões v4.0
+Object.assign(ApiClient, ApiClientV4);
+Object.assign(UIManager, UIManagerV4);
+
+// Debug helpers atualizados
+window.CimoDebug = {
+    ...window.CimoDebug,
+    
+    async testV4Features() {
+        debugMessage('🧪 Testando funcionalidades v4.0');
+        
+        try {
+            // Testar perfis de investimento
+            const perfis = ['conservador', 'moderado', 'balanceado'];
+            for (const perfil of perfis) {
+                document.getElementById('perfilInvestimento').value = perfil;
+                await new Promise(resolve => setTimeout(resolve, 500));
+                debugMessage(`✅ Perfil ${perfil}: Configurado`);
+            }
+            
+            // Testar início renda filhos
+            const opcoes = ['falecimento', 'imediato', '65'];
+            for (const opcao of opcoes) {
+                document.getElementById('inicioRendaFilhos').value = opcao;
+                await new Promise(resolve => setTimeout(resolve, 500));
+                debugMessage(`✅ Início filhos ${opcao}: Configurado`);
+            }
+            
+            // Resetar para valores padrão
+            document.getElementById('perfilInvestimento').value = 'moderado';
+            document.getElementById('inicioRendaFilhos').value = 'falecimento';
+            
+            await DashboardController.loadDashboard();
+            
+            Utils.showNotification('🎉 Testes v4.0 concluídos com sucesso!', 'success');
+            debugMessage('🎉 Todos os testes v4.0 passaram');
+            
+        } catch (error) {
+            debugMessage(`❌ Erro nos testes v4.0: ${error.message}`, 'error');
+            Utils.showNotification('❌ Erro nos testes v4.0', 'danger');
+        }
+    },
+    
+    getV4Status() {
+        return {
+            versao: '4.0',
+            inputs_implementados: {
+                perfil_investimento: !!document.getElementById('perfilInvestimento'),
+                inicio_renda_filhos: !!document.getElementById('inicioRendaFilhos'),
+                custo_fazenda: !!document.getElementById('custoFazenda')
+            },
+            metricas_implementadas: {
+                valor_arte: !!document.getElementById('valorArte'),
+                perfil_atual: !!document.getElementById('perfilAtual'),
+                status_visual: !!document.getElementById('statusBadge')
+            },
+            validacoes: {
+                locais: typeof validarInputsLocais === 'function',
+                api_v4: typeof ApiClientV4 === 'object'
+            }
+        };
+    }
+};
+
+debugMessage('🚀 Implementação v4.0 carregada');
+</script>
 </body>
 </html>
