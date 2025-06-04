@@ -984,17 +984,7 @@ def home():
 def dashboard():
     """Dashboard principal"""
     try:
-        if os.path.exists('templates/index.html'):
-            with open('templates/index.html', 'r', encoding='utf-8') as f:
-                content = f.read()
-            return content
-        else:
-            return '''
-            <h1>❌ Erro</h1>
-            <p>Arquivo index.html não encontrado.</p>
-            <p>Certifique-se de que o arquivo index.html está na mesma pasta que app.py</p>
-            <p><a href="/">← Voltar</a></p>
-            ''', 404
+           return render_template('index.html')
     except Exception as e:
         return f'''
         <h1>❌ Erro</h1>
