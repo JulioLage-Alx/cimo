@@ -134,6 +134,76 @@
         reportHistory: []
     };
 
+const DataMapper = {
+    mapApiResponse(apiData) {
+        if (!apiData || !apiData.success) {
+            debugMessage('API retornou dados inválidos ou erro', 'error');
+            return null;
+        }
+        
+        debugMessage('Mapeando resposta da API:', 'info');
+        console.log('Dados brutos da API:', apiData);
+        
+        // Estrutura dos dados retornados pela API
+        const mapped = {
+            success: apiData.success,
+            patrimonio: apiData.patrimonio || 65000000,
+            resultado: {
+                // CORREÇÃO: Mapear nomes corretos da API
+                fazenda_disponivel: apiData.resultado?.fazenda_disponivel || 0,
+                fazenda: apiData.resultado?.fazenda_disponivel || 0, // Alias para compatibilidade
+                total_compromissos: apiData.resultado?.total_compromissos || 0,
+                total: apiData.resultado?.total_compromissos || 0, // Alias para compatibilidade
+                percentual_fazenda: apiData.resultado?.percentual_fazenda || 0,
+                percentual: apiData.resultado?.percentual_fazenda || 0, // Alias para compatibilidade
+                despesas: apiData.resultado?.despesas || 0,
+                filhos: apiData.resultado?.filhos || 0,
+                doacoes: apiData.resultado?.doacoes || 0,
+                arte: apiData.resultado?.arte || 0,
+                percentual_arte: apiData.resultado?.percentual_arte || 0
+            },
+            // ADICIONADO: Dados que podem estar faltando
+            status: this.determineStatus(apiData.resultado?.fazenda_disponivel, apiData.resultado?.percentual_fazenda),
+            allocation: apiData.allocation || this.generateDefaultAllocation(),
+            sensibilidade: apiData.sensibilidade || this.generateDefaultSensitivity(),
+            versao: apiData.versao || 'unknown'
+        };
+        
+        debugMessage('Dados mapeados:', 'info');
+        console.log('Dados mapeados:', mapped);
+        
+        return mapped;
+    },
+    
+    determineStatus(fazenda, percentual) {
+        if (!fazenda || fazenda < 0) return 'crítico';
+        if (!percentual || percentual < 5) return 'crítico';
+        if (percentual < 15) return 'atenção';
+        return 'viável';
+    },
+    
+    generateDefaultAllocation() {
+        return [
+            { nome: 'Renda Fixa Nacional', percentual: 50, valor: 32500000 },
+            { nome: 'Renda Fixa Internacional', percentual: 15, valor: 9750000 },
+            { nome: 'Ações Brasil', percentual: 15, valor: 9750000 },
+            { nome: 'Ações Internacionais', percentual: 10, valor: 6500000 },
+            { nome: 'Fundos Imobiliários', percentual: 3, valor: 1950000 },
+            { nome: 'Multimercado', percentual: 3, valor: 1950000 },
+            { nome: 'Reserva de Liquidez', percentual: 2, valor: 1300000 }
+        ];
+    },
+    
+    generateDefaultSensitivity() {
+        const taxas = [2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0, 7.0, 8.0];
+        return taxas.map(taxa => ({
+            taxa,
+            fazenda: (taxa - 4) * 5000000 + 5000000, // Simulação simples
+            percentual: ((taxa - 4) * 5000000 + 5000000) / 65000000 * 100
+        }));
+    }
+};
+
     // ================ API CLIENT ================ 
     const ApiClient = {
         async fetchData() {
@@ -141,10 +211,14 @@
                 debugMessage('Iniciando requisição para API de dados');
                 
                 const params = new URLSearchParams({
-                    taxa: document.getElementById('taxaRetorno').value,
-                    expectativa: document.getElementById('expectativaVida').value,
-                    despesas: document.getElementById('despesasMensais').value
-                });
+                taxa: document.getElementById('taxaRetorno').value,
+                expectativa: document.getElementById('expectativaVida').value,
+                despesas: document.getElementById('despesasMensais').value,
+                // ADICIONAR estes 3 parâmetros obrigatórios:
+                perfil: document.getElementById('perfilInvestimento').value,
+                inicio_renda_filhos: document.getElementById('inicioRendaFilhos').value,
+                custo_fazenda: document.getElementById('custoFazenda').value
+            });
 
                 const url = `${CONFIG.ENDPOINTS.dados}?${params}`;
                 debugMessage(`URL da requisição: ${url}`);
@@ -156,14 +230,15 @@
                 }
 
                 const data = await response.json();
-                debugMessage(`Dados recebidos: ${JSON.stringify(data).substring(0, 100)}...`);
-                
-                if (!data.success) {
-                    throw new Error(data.erro || 'Erro desconhecido na API');
+                const mappedData = DataMapper.mapApiResponse(data);
+        
+                if (!mappedData.success) {
+                    throw new Error(mappedData.erro || 'Erro desconhecido na API');
                 }
 
-                return data;
+                return mappedData; // Retornar dados mapeados
             } catch (error) {
+
                 debugMessage(`Erro na API: ${error.message}`, 'error');
                 throw error;
             }
@@ -204,6 +279,93 @@
             }
         }
     };
+
+const ApiClientFixed = {
+    ...ApiClient,
+    
+    async fetchData() {
+        try {
+            // VALIDAÇÃO LOCAL PRIMEIRO
+            if (!this.validateInputsLocally()) {
+                throw new Error('Parâmetros inválidos detectados localmente');
+            }
+            
+            debugMessage('✅ Validação local passou - iniciando requisição API');
+            
+            const params = new URLSearchParams({
+                taxa: document.getElementById('taxaRetorno').value,
+                expectativa: document.getElementById('expectativaVida').value,
+                despesas: document.getElementById('despesasMensais').value,
+                perfil: document.getElementById('perfilInvestimento').value,
+                inicio_renda_filhos: document.getElementById('inicioRendaFilhos').value,
+                custo_fazenda: document.getElementById('custoFazenda').value
+            });
+
+            const url = `${CONFIG.ENDPOINTS.dados}?${params}`;
+            debugMessage(`🔗 URL da requisição: ${url}`);
+
+            const response = await fetch(url);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const rawData = await response.json();
+            debugMessage('📨 Dados brutos recebidos da API:', 'info');
+            console.log('Raw API Data:', rawData);
+            
+            if (!rawData.success) {
+                throw new Error(rawData.erro || 'Erro desconhecido na API');
+            }
+
+            // MAPEAR DADOS CORRETAMENTE
+            const mappedData = DataMapper.mapApiResponse(rawData);
+            
+            if (!mappedData) {
+                throw new Error('Falha no mapeamento dos dados da API');
+            }
+            
+            debugMessage('✅ Dados mapeados com sucesso');
+            return mappedData;
+            
+        } catch (error) {
+            debugMessage(`❌ Erro na API: ${error.message}`, 'error');
+            throw error;
+        }
+    },
+    
+    validateInputsLocally() {
+        const taxa = parseFloat(document.getElementById('taxaRetorno').value);
+        const expectativa = parseInt(document.getElementById('expectativaVida').value);
+        const despesas = parseFloat(document.getElementById('despesasMensais').value);
+        const custoFazenda = parseFloat(document.getElementById('custoFazenda').value);
+        
+        // Validações básicas
+        if (isNaN(taxa) || taxa < 0.1 || taxa > 15) {
+            Utils.showNotification('Taxa de retorno deve estar entre 0.1% e 15%', 'danger');
+            return false;
+        }
+        
+        if (isNaN(expectativa) || expectativa < 53) {
+            Utils.showNotification('Expectativa de vida deve ser pelo menos 53 anos', 'danger');
+            return false;
+        }
+        
+        if (isNaN(despesas) || despesas < 50000 || despesas > 1000000) {
+            Utils.showNotification('Despesas devem estar entre R$ 50.000 e R$ 1.000.000', 'danger');
+            return false;
+        }
+        
+        if (isNaN(custoFazenda) || custoFazenda < 500000 || custoFazenda > 10000000) {
+            Utils.showNotification('Custo da fazenda deve estar entre R$ 500.000 e R$ 10.000.000', 'danger');
+            return false;
+        }
+        
+        return true;
+    }
+};
+
+
 
     // ================ UTILITIES ================ 
     const Utils = {
@@ -1389,7 +1551,11 @@
                 const params = new URLSearchParams({
                     taxa: document.getElementById('taxaRetorno').value,
                     expectativa: document.getElementById('expectativaVida').value,
-                    despesas: document.getElementById('despesasMensais').value
+                    despesas: document.getElementById('despesasMensais').value,
+                    // ADICIONAR estes 3 parâmetros obrigatórios:
+                    perfil: document.getElementById('perfilInvestimento').value,
+                    inicio_renda_filhos: document.getElementById('inicioRendaFilhos').value,
+                    custo_fazenda: document.getElementById('custoFazenda').value
                 });
                 
                 // Add simulation parameters if it's a simulation report
@@ -1623,7 +1789,6 @@
             
             if (fazendaEl && resultado) {
                 fazendaEl.textContent = Utils.formatCurrency(resultado.fazenda, true);
-                
                 if (percentualEl) {
                     percentualEl.textContent = Utils.formatPercentage(resultado.percentual);
                 }
@@ -1642,8 +1807,8 @@
             
             // Atualizar compromissos
             const compromissosEl = document.getElementById('valorCompromissos');
-            if (compromissosEl && resultado) {
-                compromissosEl.textContent = Utils.formatCurrency(resultado.total, true);
+           if (compromissosEl && resultado) {
+            compromissosEl.textContent = Utils.formatCurrency(resultado.total, true);  // ✅ Usar alias
             }
             
             // Atualizar status
@@ -1722,6 +1887,145 @@
             }
         }
     };
+
+    const UIManagerFixed = {
+    ...UIManager,
+    
+    updateMetrics() {
+        if (!AppState.currentData) {
+            debugMessage('❌ Dados não disponíveis para atualizar métricas', 'warning');
+            return;
+        }
+        
+        debugMessage('🔄 Atualizando métricas da UI');
+        console.log('Current Data for UI Update:', AppState.currentData);
+        
+        const { resultado, patrimonio, status } = AppState.currentData;
+        
+        if (!resultado) {
+            debugMessage('❌ Resultado não encontrado nos dados', 'error');
+            return;
+        }
+        
+        // 1. PATRIMÔNIO TOTAL
+        this.updateElement('valorPatrimonio', Utils.formatCurrency(patrimonio, true));
+        
+        // 2. VALOR FAZENDA
+        const valorFazenda = resultado.fazenda_disponivel || resultado.fazenda || 0;
+        this.updateElement('valorFazenda', Utils.formatCurrency(valorFazenda, true));
+        
+        // 3. PERCENTUAL FAZENDA
+        const percentualFazenda = resultado.percentual_fazenda || resultado.percentual || 0;
+        this.updateElement('percentualFazenda', Utils.formatPercentage(percentualFazenda));
+        
+        // 4. TOTAL COMPROMISSOS
+        const totalCompromissos = resultado.total_compromissos || resultado.total || 0;
+        this.updateElement('valorCompromissos', Utils.formatCurrency(totalCompromissos, true));
+        
+        // 5. STATUS DO PLANO
+        const statusText = status || 'Calculando...';
+        this.updateElement('valorStatus', statusText.charAt(0).toUpperCase() + statusText.slice(1));
+        
+        // 6. VALOR ARTE
+        const valorArte = resultado.arte || 0;
+        this.updateElement('valorArte', Utils.formatCurrency(valorArte, true));
+        
+        // 7. PERCENTUAL ARTE
+        const percentualArte = resultado.percentual_arte || 0;
+        this.updateElement('percentualArte', Utils.formatPercentage(percentualArte));
+        
+        // 8. RETORNO ESPERADO
+        const retornoEsperado = this.getRetornoEsperado();
+        this.updateElement('retornoEsperado', retornoEsperado);
+        
+        // 9. ATUALIZAR TRENDS
+        this.updateTrends(valorFazenda, percentualFazenda, valorArte, percentualArte);
+        
+        // 10. ATUALIZAR STATUS VISUAL
+        this.updateStatusVisual(status);
+        
+        debugMessage('✅ Métricas atualizadas com sucesso');
+    },
+    
+    updateElement(elementId, value) {
+        const element = document.getElementById(elementId);
+        if (element) {
+            element.textContent = value;
+            debugMessage(`📝 Atualizado ${elementId}: ${value}`);
+        } else {
+            debugMessage(`⚠️ Elemento ${elementId} não encontrado`, 'warning');
+        }
+    },
+    
+    getRetornoEsperado() {
+        const perfil = document.getElementById('perfilInvestimento').value;
+        const retornos = {
+            'conservador': '3.5% a.a.',
+            'moderado': '4.5% a.a.',
+            'balanceado': '5.2% a.a.'
+        };
+        return retornos[perfil] || '4.5% a.a.';
+    },
+    
+    updateTrends(valorFazenda, percentualFazenda, valorArte, percentualArte) {
+        // Trend Fazenda
+        const trendFazenda = document.getElementById('trendFazenda');
+        if (trendFazenda) {
+            trendFazenda.className = 'metric-trend';
+            if (valorFazenda > 0) {
+                trendFazenda.classList.add('positive');
+                trendFazenda.innerHTML = `<i class="fas fa-arrow-up"></i><span>${Utils.formatPercentage(percentualFazenda)}</span>`;
+            } else {
+                trendFazenda.classList.add('negative');
+                trendFazenda.innerHTML = `<i class="fas fa-arrow-down"></i><span>${Utils.formatPercentage(percentualFazenda)}</span>`;
+            }
+        }
+        
+        // Trend Arte
+        const trendArte = document.getElementById('trendArte');
+        if (trendArte) {
+            trendArte.className = 'metric-trend';
+            if (valorArte > 0) {
+                trendArte.classList.add('positive');
+                trendArte.innerHTML = `<i class="fas fa-palette"></i><span>${Utils.formatPercentage(percentualArte)}</span>`;
+            } else {
+                trendArte.classList.add('neutral');
+                trendArte.innerHTML = `<i class="fas fa-palette"></i><span>Indisponível</span>`;
+            }
+        }
+    },
+    
+    updateStatusVisual(status) {
+        const statusBadge = document.getElementById('statusBadge');
+        const statusText = document.getElementById('statusText');
+        const statusDescription = document.getElementById('statusDescription');
+        
+        if (!statusBadge || !statusText || !statusDescription) return;
+        
+        // Remover classes anteriores
+        statusBadge.classList.remove('critico', 'atencao', 'viavel');
+        
+        let icon, description;
+        
+        if (status === 'crítico') {
+            statusBadge.classList.add('critico');
+            icon = 'exclamation-triangle';
+            description = 'Plano insustentável - ação urgente necessária';
+        } else if (status === 'atenção') {
+            statusBadge.classList.add('atencao');
+            icon = 'exclamation-circle';
+            description = 'Plano viável mas com margem baixa';
+        } else {
+            statusBadge.classList.add('viavel');
+            icon = 'check-circle';
+            description = 'Plano sustentável com boa margem';
+        }
+        
+        statusBadge.innerHTML = `<i class="fas fa-${icon}"></i><span>${status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Calculando'}</span>`;
+        statusDescription.textContent = description;
+    }
+};
+
 
     // ================ GLOBAL FUNCTIONS ================ 
     function showPage(pageId) {
@@ -1987,6 +2291,83 @@
             }
         }
     };
+
+    const DashboardControllerFixed = {
+    ...DashboardController,
+    
+    async loadDashboard() {
+        try {
+            debugMessage('🚀 Iniciando carregamento do dashboard');
+            
+            // Mostrar loading
+            UIManager.showLoading(true);
+            AppState.isLoading = true;
+            
+            // Limpar estado anterior
+            AppState.currentData = null;
+            
+            // Buscar dados da API Flask com validação
+            const data = await ApiClientFixed.fetchData();
+            
+            if (!data) {
+                throw new Error('Dados da API são nulos ou inválidos');
+            }
+            
+            debugMessage('✅ Dados recebidos e validados com sucesso');
+            console.log('Final Data for AppState:', data);
+            
+            // Atualizar estado da aplicação
+            AppState.currentData = data;
+            
+            // Atualizar UI com dados válidos
+            UIManagerFixed.updateMetrics();
+            UIManager.updateAlerts();
+            UIManager.updateTable();
+            
+            // Criar gráficos com delay
+            setTimeout(() => {
+                if (AppState.chartJsLoaded) {
+                    ChartManager.createCharts();
+                } else {
+                    ChartManager.showAlternativeVisualization();
+                }
+            }, 300);
+            
+            Utils.showNotification('✅ Dashboard atualizado com sucesso!', 'success');
+            
+        } catch (error) {
+            debugMessage(`❌ Erro ao carregar dashboard: ${error.message}`, 'error');
+            Utils.showNotification(`❌ Erro ao carregar dados: ${error.message}`, 'danger');
+            
+            // Mostrar erro detalhado
+            this.showDetailedError(error);
+            
+        } finally {
+            // Remover loading
+            UIManager.showLoading(false);
+            AppState.isLoading = false;
+        }
+    },
+    
+    showDetailedError(error) {
+        const container = document.getElementById('alertContainer');
+        if (container) {
+            container.innerHTML = `
+                <div class="alert danger">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <div>
+                        <strong>Erro de Conexão:</strong> ${error.message}<br>
+                        <small>Verifique se o backend Flask está rodando em http://localhost:5000</small>
+                        <br><br>
+                        <button onclick="DashboardController.loadDashboard()" style="background: var(--primary); color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; margin-top: 8px;">
+                            🔄 Tentar Novamente
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+    }
+};
 
     // ================ DEBUG HELPERS ================ 
     window.CimoDebug = {
@@ -2359,10 +2740,14 @@ cacheTimeout: 60000, // 1 minuto
 
 async fetchDataWithCache() {
     const params = new URLSearchParams({
-        taxa: document.getElementById('taxaRetorno').value,
-        expectativa: document.getElementById('expectativaVida').value,
-        despesas: document.getElementById('despesasMensais').value
-    });
+    taxa: document.getElementById('taxaRetorno').value,
+    expectativa: document.getElementById('expectativaVida').value,
+    despesas: document.getElementById('despesasMensais').value,
+    // ADICIONAR estes 3 parâmetros obrigatórios:
+    perfil: document.getElementById('perfilInvestimento').value,
+    inicio_renda_filhos: document.getElementById('inicioRendaFilhos').value,
+    custo_fazenda: document.getElementById('custoFazenda').value
+});
     
     const cacheKey = params.toString();
     const cached = this.cache.get(cacheKey);
@@ -2668,67 +3053,66 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Substituir ApiClient e UIManager por versões v4.0
-Object.assign(ApiClient, ApiClientV4);
-Object.assign(UIManager, UIManagerV4);
+Object.assign(ApiClient, ApiClientFixed);
+Object.assign(UIManager, UIManagerFixed);
+Object.assign(DashboardController, DashboardControllerFixed);
 
 // Debug helpers atualizados
 window.CimoDebug = {
     ...window.CimoDebug,
     
-    async testV4Features() {
-        debugMessage('🧪 Testando funcionalidades v4.0');
-        
-        try {
-            // Testar perfis de investimento
-            const perfis = ['conservador', 'moderado', 'balanceado'];
-            for (const perfil of perfis) {
-                document.getElementById('perfilInvestimento').value = perfil;
-                await new Promise(resolve => setTimeout(resolve, 500));
-                debugMessage(`✅ Perfil ${perfil}: Configurado`);
-            }
-            
-            // Testar início renda filhos
-            const opcoes = ['falecimento', 'imediato', '65'];
-            for (const opcao of opcoes) {
-                document.getElementById('inicioRendaFilhos').value = opcao;
-                await new Promise(resolve => setTimeout(resolve, 500));
-                debugMessage(`✅ Início filhos ${opcao}: Configurado`);
-            }
-            
-            // Resetar para valores padrão
-            document.getElementById('perfilInvestimento').value = 'moderado';
-            document.getElementById('inicioRendaFilhos').value = 'falecimento';
-            
-            await DashboardController.loadDashboard();
-            
-            Utils.showNotification('🎉 Testes v4.0 concluídos com sucesso!', 'success');
-            debugMessage('🎉 Todos os testes v4.0 passaram');
-            
-        } catch (error) {
-            debugMessage(`❌ Erro nos testes v4.0: ${error.message}`, 'error');
-            Utils.showNotification('❌ Erro nos testes v4.0', 'danger');
-        }
+    forceRefresh: async () => {
+        debugMessage('🔧 Forçando refresh completo dos dados');
+        AppState.currentData = null;
+        await DashboardController.loadDashboard();
     },
     
-    getV4Status() {
-        return {
-            versao: '4.0',
-            inputs_implementados: {
-                perfil_investimento: !!document.getElementById('perfilInvestimento'),
-                inicio_renda_filhos: !!document.getElementById('inicioRendaFilhos'),
-                custo_fazenda: !!document.getElementById('custoFazenda')
+    testDataMapping: () => {
+        debugMessage('🧪 Testando mapeamento de dados');
+        
+        // Dados de teste simulando resposta da API
+        const testApiData = {
+            success: true,
+            patrimonio: 65000000,
+            resultado: {
+                fazenda_disponivel: 17687612,
+                total_compromissos: 47312388,
+                percentual_fazenda: 27.2,
+                despesas: 35083874,
+                filhos: 5436046,
+                doacoes: 6792469,
+                arte: 15687612,
+                percentual_arte: 24.1
             },
-            metricas_implementadas: {
-                valor_arte: !!document.getElementById('valorArte'),
-                perfil_atual: !!document.getElementById('perfilAtual'),
-                status_visual: !!document.getElementById('statusBadge')
-            },
-            validacoes: {
-                locais: typeof validarInputsLocais === 'function',
-                api_v4: typeof ApiClientV4 === 'object'
-            }
+            versao: "4.1-TEST"
         };
+        
+        const mapped = DataMapper.mapApiResponse(testApiData);
+        console.log('Teste de mapeamento:', mapped);
+        
+        // Aplicar dados de teste
+        AppState.currentData = mapped;
+        UIManagerFixed.updateMetrics();
+        
+        Utils.showNotification('✅ Teste de mapeamento aplicado!', 'success');
+    },
+    
+    checkUIElements: () => {
+        const elements = [
+            'valorPatrimonio', 'valorFazenda', 'percentualFazenda',
+            'valorCompromissos', 'valorStatus', 'valorArte', 'percentualArte'
+        ];
+        
+        elements.forEach(id => {
+            const el = document.getElementById(id);
+            console.log(`Elemento ${id}:`, el ? '✅ Encontrado' : '❌ Não encontrado');
+        });
+    },
+    
+    simulateAPIError: () => {
+        debugMessage('🚨 Simulando erro da API');
+        DashboardController.showDetailedError(new Error('Erro simulado para teste'));
     }
 };
 
-debugMessage('🚀 Implementação v4.0 carregada');
+debugMessage('🔧 Correções aplicadas - versão FIXED');
