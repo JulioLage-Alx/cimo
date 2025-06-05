@@ -121,13 +121,11 @@
         <div class="control-group">
             <label for="taxaRetorno">
                 Taxa de Retorno Real (%)
-                <span class="tooltip" title="Taxa já descontada da inflação (~3.5% a.a.)">ℹ️</span>
+                <span class="tooltip" title="Taxa já descontada da inflação (~3.5% a.a.)">*</span>
             </label>
             <input type="range" id="taxaRetorno" class="range-input" min="2" max="8" step="0.1" value="4.0">
             <div class="range-value" id="taxaDisplay">4.0%</div>
-            <small style="color: var(--gray-500); font-size: 0.75rem; margin-top: 4px; display: block;">
-                Retorno real, já descontada a inflação (ex.: 4% ao ano real)
-            </small>
+            
         </div>
         
         <!-- Input existente: Expectativa de Vida -->
@@ -149,15 +147,14 @@
         
         <!-- NOVO INPUT: Perfil de Investimento -->
         <div class="control-group">
-            <label for="perfilInvestimento">Perfil de Investimento</label>
+            <label for="perfilInvestimento">Perfil de Investimento
+            <span class="tooltip" title="Define alocação de ativos e retorno esperado">*</span> </label>
             <select id="perfilInvestimento">
                 <option value="conservador">Conservador (3.5% a.a.)</option>
                 <option value="moderado" selected>Moderado (4.5% a.a.)</option>
                 <option value="balanceado">Balanceado (5.2% a.a.)</option>
             </select>
-            <small style="color: var(--gray-500); font-size: 0.75rem; margin-top: 4px; display: block;">
-                Define alocação de ativos e retorno esperado
-            </small>
+          
         </div>
         
             <!-- NOVO INPUT: Início da Renda dos Filhos -->
