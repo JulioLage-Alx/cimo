@@ -161,7 +161,7 @@
         <div class="control-group">
             <label for="inicioRendaFilhos">
                 Início da Renda dos Filhos
-                <span class="tooltip" title="Escolha quando os filhos devem começar a receber: ao falecimento de Ana, imediatamente ou a partir de certa idade">ℹ️</span>
+                <span class="tooltip" title="Escolha quando os filhos devem começar a receber: ao falecimento de Ana, imediatamente ou a partir de certa idade">*</span>
             </label>
             <select id="inicioRendaFilhos">
                 <option value="falecimento" selected>Após falecimento de Ana</option>
@@ -170,19 +170,18 @@
                 <option value="70">Aos 70 anos de Ana</option>
                 <option value="75">Aos 75 anos de Ana</option>
             </select>
-            <small style="color: var(--gray-500); font-size: 0.75rem; margin-top: 4px; display: block;">
-                Timing flexível para atender objetivos familiares
-            </small>
+            
         </div>
         
         <!-- NOVO INPUT: Custo Estimado da Fazenda -->
         <div class="control-group">
-            <label for="custoFazenda">Custo Estimado da Fazenda (R$)</label>
+            <label for="custoFazenda">Custo Estimado da Fazenda (R$)
+            <span class="tooltip" title="Usado para calcular verba disponível para arte">*</span>
+            
+            </label>
             <input type="number" id="custoFazenda" value="2000000" step="100000" 
                    min="500000" max="10000000">
-            <small style="color: var(--gray-500); font-size: 0.75rem; margin-top: 4px; display: block;">
-                Usado para calcular verba disponível para arte
-            </small>
+         
         </div>
         
         <!-- Input existente: Status Sistema -->
