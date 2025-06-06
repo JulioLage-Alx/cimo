@@ -1626,140 +1626,324 @@ mapBackendResponse(backendData) {
     };
 
     // ================ REPORT MANAGER SINCRONIZADO ================ 
-    const ReportManager = {
-        async generatePDFReport(tipo) {
-            debugMessage(`⚠️ AVISO: Tentativa de gerar relatório ${tipo} - funcionalidade não implementada no backend`);
+    // ================ REPORT MANAGER EXTENDIDO ================
+const ReportManager = {
+    async generateDetailedReport(tipo, parametros = null) {
+        debugMessage(`Gerando relatório detalhado: ${tipo}`);
+        
+        this.showReportStatus(true, `Preparando relatório ${tipo}...`);
+        
+        try {
+            // Coletar parâmetros atuais se não fornecidos
+            const params = parametros || this.collectCurrentParameters();
             
-            this.showReportStatus(true, `Simulando geração de relatório ${tipo}...`);
+            debugMessage(`Parâmetros coletados: ${JSON.stringify(params)}`);
             
-            try {
-                // ✅ SIMULAÇÃO LOCAL - BACKEND NÃO TEM ENDPOINTS DE RELATÓRIO
-                await new Promise(resolve => setTimeout(resolve, 2000)); // Simular delay
+            // Preview dos dados primeiro
+            const previewData = await this.fetchReportPreview(tipo, params);
+            
+            if (previewData.success) {
+                // Mostrar preview opcional
+                const shouldProceed = await this.showReportPreview(tipo, previewData);
                 
-                this.addToReportHistory(tipo, {
-                    taxa: document.getElementById('taxaRetorno').value,
-                    expectativa: document.getElementById('expectativaVida').value,
-                    despesas: document.getElementById('despesasMensais').value
-                });
-                
-                this.showReportStatus(false);
-                Utils.showNotification(`⚠️ Relatório ${tipo} simulado - implementação no backend pendente`, 'warning');
-                
-                debugMessage(`Relatório ${tipo} simulado localmente`);
-                
-            } catch (error) {
-                debugMessage(`Erro ao simular relatório: ${error.message}`, 'error');
-                this.showReportStatus(false);
-                Utils.showNotification(`Erro ao gerar relatório: ${error.message}`, 'danger');
-            }
-        },
-
-        showReportStatus(show, message = '') {
-            const statusEl = document.getElementById('reportStatus');
-            if (statusEl) {
-                if (show) {
-                    statusEl.style.display = 'block';
-                    statusEl.innerHTML = `
-                        <i class="fas fa-spinner fa-spin"></i>
-                        <span>${message}</span>
-                    `;
-                } else {
-                    statusEl.style.display = 'none';
+                if (shouldProceed) {
+                    // Gerar PDF final
+                    await this.downloadPDFReport(tipo, params);
                 }
-            }
-        },
-
-        addToReportHistory(tipo, params) {
-            const now = new Date();
-            const report = {
-                id: Date.now(),
-                timestamp: now,
-                tipo: tipo,
-                parametros: {
-                    taxa: params.taxa,
-                    expectativa: params.expectativa,
-                    despesas: params.despesas
-                },
-                status: 'simulado'
-            };
-            
-            AppState.reportHistory.unshift(report);
-            AppState.reportHistory = AppState.reportHistory.slice(0, 10);
-            
-            this.updateReportHistoryTable();
-        },
-
-        updateReportHistoryTable() {
-            const tbody = document.getElementById('reportHistoryBody');
-            if (!tbody) return;
-            
-            if (AppState.reportHistory.length === 0) {
-                tbody.innerHTML = `
-                    <tr>
-                        <td colspan="5" style="text-align: center; color: var(--gray-500); padding: 40px;">
-                            Nenhum relatório gerado ainda. Clique em um dos cartões acima para gerar seu primeiro relatório.
-                        </td>
-                    </tr>
-                `;
-                return;
+            } else {
+                throw new Error(previewData.error || 'Erro ao gerar preview');
             }
             
-            tbody.innerHTML = AppState.reportHistory.map(report => {
-                let reportTypeName;
-                switch(report.tipo) {
-                    case 'executivo':
-                        reportTypeName = 'Relatório Executivo';
-                        break;
-                    case 'detalhado':
-                        reportTypeName = 'Análise Detalhada';
-                        break;
-                    case 'simulacao':
-                        reportTypeName = 'Simulação Monte Carlo';
-                        break;
-                    default:
-                        reportTypeName = `Relatório ${report.tipo.charAt(0).toUpperCase() + report.tipo.slice(1)}`;
-                }
-                
-                return `
-                    <tr>
-                        <td>${report.timestamp.toLocaleString('pt-BR')}</td>
-                        <td>${reportTypeName}</td>
-                        <td>
-                            Taxa: ${report.parametros.taxa}%, 
-                            Expectativa: ${report.parametros.expectativa} anos, 
-                            Despesas: ${Utils.formatCurrency(parseFloat(report.parametros.despesas), true)}
-                        </td>
-                        <td><span class="status-badge warning">Simulado</span></td>
-                        <td>
-                            <button class="widget-action" onclick="ReportManager.regenerateReport('${report.tipo}', ${JSON.stringify(report.parametros).replace(/"/g, '&quot;')})" title="Regenerar relatório">
-                                <i class="fas fa-redo"></i>
-                            </button>
-                        </td>
-                    </tr>
-                `;
-            }).join('');
-        },
-
-        async regenerateReport(tipo, parametros) {
-            debugMessage(`Regenerando relatório: ${tipo}`);
-            
-            const originalValues = {
-                taxa: document.getElementById('taxaRetorno').value,
-                expectativa: document.getElementById('expectativaVida').value,
-                despesas: document.getElementById('despesasMensais').value
-            };
-            
-            document.getElementById('taxaRetorno').value = parametros.taxa;
-            document.getElementById('expectativaVida').value = parametros.expectativa;
-            document.getElementById('despesasMensais').value = parametros.despesas;
-            
-            await this.generatePDFReport(tipo);
-            
-            document.getElementById('taxaRetorno').value = originalValues.taxa;
-            document.getElementById('expectativaVida').value = originalValues.expectativa;
-            document.getElementById('despesasMensais').value = originalValues.despesas;
+        } catch (error) {
+            debugMessage(`Erro ao gerar relatório: ${error.message}`, 'error');
+            Utils.showNotification(`Erro: ${error.message}`, 'danger');
+        } finally {
+            this.showReportStatus(false);
         }
-    };
+    },
+    
+    collectCurrentParameters() {
+        return {
+            taxa: document.getElementById('taxaRetorno').value,
+            expectativa: document.getElementById('expectativaVida').value,
+            despesas: document.getElementById('despesasMensais').value,
+            perfil: document.getElementById('perfilInvestimento').value,
+            inicio_renda_filhos: document.getElementById('inicioRendaFilhos').value,
+            custo_fazenda: document.getElementById('custoFazenda').value
+        };
+    },
+    
+    async fetchReportPreview(tipo, params) {
+        const url = `/api/relatorio-preview/${tipo}?${new URLSearchParams(params)}`;
+        debugMessage(`Buscando preview: ${url}`);
+        
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        return await response.json();
+    },
+    
+    async showReportPreview(tipo, previewData) {
+        return new Promise((resolve) => {
+            // Criar modal de preview
+            const modal = this.createPreviewModal(tipo, previewData);
+            document.body.appendChild(modal);
+            
+            // Event listeners para botões
+            modal.querySelector('.btn-confirm').onclick = () => {
+                modal.remove();
+                resolve(true);
+            };
+            
+            modal.querySelector('.btn-cancel').onclick = () => {
+                modal.remove();
+                resolve(false);
+            };
+            
+            modal.querySelector('.btn-close').onclick = () => {
+                modal.remove();
+                resolve(false);
+            };
+        });
+    },
+    
+    createPreviewModal(tipo, previewData) {
+        const modal = document.createElement('div');
+        modal.className = 'report-preview-modal';
+        modal.innerHTML = `
+            <div class="modal-overlay">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>📋 Preview: Relatório ${tipo.charAt(0).toUpperCase() + tipo.slice(1)}</h3>
+                        <button class="btn-close">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        ${this.formatPreviewContent(tipo, previewData)}
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary btn-cancel">Cancelar</button>
+                        <button class="btn btn-primary btn-confirm">📄 Gerar PDF</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        return modal;
+    },
+    
+    formatPreviewContent(tipo, previewData) {
+        const { dados_preview, parametros, dados_base } = previewData;
+        
+        let content = `
+            <div class="preview-section">
+                <h4>📊 Parâmetros Configurados:</h4>
+                <div class="preview-grid">
+                    <div class="preview-item">
+                        <strong>Taxa:</strong> ${parametros.taxa}% a.a.
+                    </div>
+                    <div class="preview-item">
+                        <strong>Expectativa:</strong> ${parametros.expectativa} anos
+                    </div>
+                    <div class="preview-item">
+                        <strong>Despesas:</strong> ${Utils.formatCurrency(parametros.despesas, true)}/mês
+                    </div>
+                    <div class="preview-item">
+                        <strong>Perfil:</strong> ${parametros.perfil}
+                    </div>
+                </div>
+            </div>
+            
+            <div class="preview-section">
+                <h4>🎯 Resultado Principal:</h4>
+                <div class="status-preview ${dados_base.status}">
+                    <strong>Status:</strong> ${dados_base.status.toUpperCase()}<br>
+                    <strong>Fazenda:</strong> ${Utils.formatCurrency(dados_base.fazenda_disponivel, true)}<br>
+                    <strong>Percentual:</strong> ${dados_base.percentual_fazenda.toFixed(1)}%
+                </div>
+            </div>
+        `;
+        
+        if (tipo === 'executivo') {
+            content += `
+                <div class="preview-section">
+                    <h4>💡 Principais Insights:</h4>
+                    <ul class="insights-list">
+                        ${dados_preview.insights.slice(0, 3).map(insight => `<li>${insight}</li>`).join('')}
+                    </ul>
+                </div>
+                <div class="preview-section">
+                    <h4>🎯 Recomendações:</h4>
+                    <ul class="recommendations-list">
+                        ${dados_preview.recomendacoes.slice(0, 3).map(rec => `<li>${rec}</li>`).join('')}
+                    </ul>
+                </div>
+            `;
+        } else if (tipo === 'tecnico') {
+            content += `
+                <div class="preview-section">
+                    <h4>🔬 Metodologia Incluída:</h4>
+                    <ul>
+                        <li>Fórmulas de valor presente detalhadas</li>
+                        <li>Premissas e cálculos explicados</li>
+                        <li>Projeções anuais completas</li>
+                        <li>Asset allocation detalhado</li>
+                    </ul>
+                </div>
+            `;
+        } else if (tipo === 'simulacao') {
+            const stressTests = Object.keys(dados_preview.stress_tests || {});
+            content += `
+                <div class="preview-section">
+                    <h4>⚡ Stress Tests Incluídos:</h4>
+                    <ul>
+                        ${stressTests.map(test => `<li>${test.replace('_', ' ').toUpperCase()}</li>`).join('')}
+                    </ul>
+                </div>
+                <div class="preview-section">
+                    <h4>📈 Análises de Sensibilidade:</h4>
+                    <ul>
+                        <li>Impacto da taxa de retorno (2% a 10%)</li>
+                        <li>Impacto das despesas mensais</li>
+                        <li>Cenários de otimização</li>
+                    </ul>
+                </div>
+            `;
+        }
+        
+        return content;
+    },
+    
+    async downloadPDFReport(tipo, params) {
+        const url = `/api/relatorio/${tipo}?${new URLSearchParams(params)}`;
+        debugMessage(`Baixando PDF: ${url}`);
+        
+        this.showReportStatus(true, 'Gerando PDF... Isso pode levar alguns segundos.');
+        
+        try {
+            const response = await fetch(url);
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Erro ${response.status}: ${errorText}`);
+            }
+            
+            // Download do arquivo
+            const blob = await response.blob();
+            const downloadUrl = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            link.download = `relatorio_${tipo}_${new Date().toISOString().slice(0,10)}.pdf`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            window.URL.revokeObjectURL(downloadUrl);
+            
+            // Adicionar ao histórico
+            this.addToReportHistory(tipo, params);
+            
+            Utils.showNotification(`✅ Relatório ${tipo} gerado com sucesso!`, 'success');
+            
+        } catch (error) {
+            throw new Error(`Falha ao gerar PDF: ${error.message}`);
+        }
+    },
+    
+    // Manter funções existentes
+    showReportStatus(show, message = '') {
+        const statusEl = document.getElementById('reportStatus');
+        if (statusEl) {
+            if (show) {
+                statusEl.style.display = 'block';
+                statusEl.innerHTML = `
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <span>${message}</span>
+                `;
+            } else {
+                statusEl.style.display = 'none';
+            }
+        }
+    },
+    
+    addToReportHistory(tipo, params) {
+        const now = new Date();
+        const report = {
+            id: Date.now(),
+            timestamp: now,
+            tipo: tipo,
+            parametros: {
+                taxa: params.taxa,
+                expectativa: params.expectativa,
+                despesas: params.despesas,
+                perfil: params.perfil
+            },
+            status: 'gerado'
+        };
+        
+        AppState.reportHistory.unshift(report);
+        AppState.reportHistory = AppState.reportHistory.slice(0, 10);
+        
+        this.updateReportHistoryTable();
+    },
+    
+    updateReportHistoryTable() {
+        const tbody = document.getElementById('reportHistoryBody');
+        if (!tbody) return;
+        
+        if (AppState.reportHistory.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="5" style="text-align: center; color: var(--gray-500); padding: 40px;">
+                        Nenhum relatório gerado ainda. Clique em um dos cartões acima para gerar seu primeiro relatório.
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+        
+        tbody.innerHTML = AppState.reportHistory.map(report => {
+            let reportTypeName;
+            switch(report.tipo) {
+                case 'executivo':
+                    reportTypeName = 'Relatório Executivo';
+                    break;
+                case 'tecnico':
+                    reportTypeName = 'Relatório Técnico';
+                    break;
+                case 'simulacao':
+                    reportTypeName = 'Simulação e Cenários';
+                    break;
+                default:
+                    reportTypeName = `Relatório ${report.tipo.charAt(0).toUpperCase() + report.tipo.slice(1)}`;
+            }
+            
+            return `
+                <tr>
+                    <td>${report.timestamp.toLocaleString('pt-BR')}</td>
+                    <td>${reportTypeName}</td>
+                    <td>
+                        Taxa: ${report.parametros.taxa}%, 
+                        Expectativa: ${report.parametros.expectativa} anos, 
+                        Despesas: ${Utils.formatCurrency(parseFloat(report.parametros.despesas), true)}
+                    </td>
+                    <td><span class="status-badge success">Gerado</span></td>
+                    <td>
+                        <button class="widget-action" onclick="ReportManager.regenerateReport('${report.tipo}', ${JSON.stringify(report.parametros).replace(/"/g, '&quot;')})" title="Regenerar relatório">
+                            <i class="fas fa-redo"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    },
+    
+    async regenerateReport(tipo, parametros) {
+        debugMessage(`Regenerando relatório: ${tipo}`);
+        await this.generateDetailedReport(tipo, parametros);
+    }
+};
 
     // ================ UI MANAGER SINCRONIZADO ================ 
     const UIManager = {
@@ -2144,7 +2328,7 @@ mapBackendResponse(backendData) {
 
     function generateReportPDF(tipo) {
         debugMessage(`Solicitação de geração de relatório: ${tipo}`);
-        ReportManager.generatePDFReport(tipo);
+        ReportManager.generateDetailedReport(tipo);
     }
 
     function generateReport(type) {
@@ -2439,6 +2623,27 @@ mapBackendResponse(backendData) {
             }
             SimulationManager.runSimulation();
         },
+         testReportPreview: async (tipo = 'executivo') => {
+        try {
+            const preview = await ReportManager.fetchReportPreview(tipo, ReportManager.collectCurrentParameters());
+            console.log('Preview data:', preview);
+            debugMessage(`Preview ${tipo} testado com sucesso`);
+            return preview;
+        } catch (error) {
+            console.error('Erro no preview:', error);
+            debugMessage(`Erro no preview ${tipo}: ${error.message}`, 'error');
+        }
+    },
+    
+    testReportGeneration: (tipo = 'executivo') => {
+        ReportManager.generateDetailedReport(tipo);
+    },
+    
+    testAllReportTypes: () => {
+        ['executivo', 'tecnico', 'simulacao'].forEach(tipo => {
+            setTimeout(() => ReportManager.generateDetailedReport(tipo), 1000);
+        });
+    },
         
         testReport: (tipo) => {
             debugMessage(`Testando relatório: ${tipo} (simulação local)`);
