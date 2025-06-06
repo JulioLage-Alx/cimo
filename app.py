@@ -345,7 +345,8 @@ def avaliar_sustentabilidade_fazenda(custo_fazenda, patrimonio_disponivel, sobra
         'percentual_patrimonio': percentual_patrimonio,
         'percentual_sobra': percentual_sobra,
         'recomendacao': recomendacao,
-        'custo_maximo_teorico': sobra_apos_compromissos
+        'custo_maximo_teorico': sobra_apos_compromissos,
+        'custo_maximo_disponivel': custo_maximo if 'custo_maximo' in locals() else sobra_apos_compromissos  # ✅ ADICIONADO
     }
 
 
@@ -637,9 +638,6 @@ def gerar_projecao_fluxo(taxa, expectativa, despesas, anos=20, inicio_renda_filh
             if ano_falecimento is None and idade_ana == expectativa + 1:
                 ano_falecimento = ano_calendario - 1  # Ano anterior foi último ano de vida
         
-        # Renda dos filhos (se já iniciou)
-        if idade_ana >= idade_inicio_filhos:
-            saidas_anuais += RENDA_FILHOS * 12
         
         # Doações (apenas nos primeiros 15 anos)
         if ano < PERIODO_DOACOES:

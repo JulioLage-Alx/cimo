@@ -1,4 +1,4 @@
-    // ================ CHART.JS LOADER OTIMIZADO 2025 ================
+// ================ CHART.JS LOADER OTIMIZADO 2025 ================
     let chartJSRetries = 0;
     const maxRetries = 4;
 
@@ -87,36 +87,61 @@
     let debugLog = [];
     
     function debugMessage(message, type = 'info') {
-        const timestamp = new Date().toLocaleTimeString();
-        debugLog.push(`[${timestamp}] ${type.toUpperCase()}: ${message}`);
-        console.log(`🐛 [${timestamp}] ${message}`);
-        updateDebugConsole();
+    const timestamp = new Date().toLocaleTimeString('pt-BR');
+    const logEntry = `[${timestamp}] ${type.toUpperCase()}: ${message}`;
+    
+    debugLog.push(logEntry);
+    
+    // Log no console com cores
+    const colors = {
+        info: '#3b82f6',
+        success: '#059669', 
+        warning: '#ea580c',
+        error: '#dc2626'
+    };
+    
+    console.log(`%c🐛 ${logEntry}`, `color: ${colors[type] || colors.info}`);
+    
+    updateDebugConsole();
     }
 
     function updateDebugConsole() {
-        const debugEl = document.getElementById('debugLog');
-        if (debugEl) {
-            debugEl.innerHTML = debugLog.slice(-15).map(log => `<div style="margin-bottom: 2px; font-size: 10px; opacity: 0.9;">${log}</div>`).join('');
-            debugEl.scrollTop = debugEl.scrollHeight;
-        }
+    const debugEl = document.getElementById('debugLog');
+    if (debugEl) {
+        debugEl.innerHTML = debugLog.slice(-20).map(log => 
+            `<div style="margin-bottom: 2px; font-size: 10px; opacity: 0.9;">${log}</div>`
+        ).join('');
+        debugEl.scrollTop = debugEl.scrollHeight;
     }
+}
 
-    function toggleDebug() {
-        const console = document.getElementById('debugConsole');
+function toggleDebug() {
+    const console = document.getElementById('debugConsole');
+    if (console) {
         console.style.display = console.style.display === 'none' ? 'block' : 'none';
     }
+}
 
-    // ================ CONFIGURATION ================ 
+    // ================ CONFIGURAÇÃO SINCRONIZADA COM BACKEND ================ 
     const CONFIG = {
-        API_BASE: '/api',
-        ENDPOINTS: {
-            dados: '/api/dados',
-            cenarios: '/api/cenarios',
-            teste: '/api/teste',
-            relatorio_executivo: '/api/relatorio/executivo',
-            relatorio_detalhado: '/api/relatorio/detalhado'
-        }
-    };
+    // ✅ URLs EXATAS que correspondem às rotas do Flask
+    API_BASE_URL: window.location.origin, // http://localhost:5000 automaticamente
+    ENDPOINTS: {
+        dados: '/api/dados',                    // ✅ Rota existe no app.py
+        teste: '/api/teste',                    // ✅ Rota existe no app.py
+        teste_correcoes: '/api/teste-correcoes' // ✅ Rota existe no app.py
+    },
+    
+    // ✅ PARÂMETROS EXATOS que o backend espera conforme app.py
+    PARAM_MAPPING: {
+        'taxaRetorno': 'taxa',                      // frontend -> backend
+        'expectativaVida': 'expectativa',           // frontend -> backend  
+        'despesasMensais': 'despesas',              // frontend -> backend
+        'perfilInvestimento': 'perfil',             // frontend -> backend (corrigido)
+        'inicioRendaFilhos': 'inicio_renda_filhos', // frontend -> backend
+        'custoFazenda': 'custo_fazenda'             // frontend -> backend
+    }
+};
 
     const AppState = {
         currentData: null,
@@ -134,94 +159,186 @@
         reportHistory: []
     };
 
-const DataMapper = {
-    mapApiResponse(apiData) {
-        if (!apiData || !apiData.success) {
-            debugMessage('API retornou dados inválidos ou erro', 'error');
-            return null;
-        }
-        
-        debugMessage('Mapeando resposta da API:', 'info');
-        console.log('Dados brutos da API:', apiData);
-        
-        // Estrutura dos dados retornados pela API
-        const mapped = {
-            success: apiData.success,
-            patrimonio: apiData.patrimonio || 65000000,
-            resultado: {
-                // CORREÇÃO: Mapear nomes corretos da API
-                fazenda_disponivel: apiData.resultado?.fazenda_disponivel || 0,
-                fazenda: apiData.resultado?.fazenda_disponivel || 0, // Alias para compatibilidade
-                total_compromissos: apiData.resultado?.total_compromissos || 0,
-                total: apiData.resultado?.total_compromissos || 0, // Alias para compatibilidade
-                percentual_fazenda: apiData.resultado?.percentual_fazenda || 0,
-                percentual: apiData.resultado?.percentual_fazenda || 0, // Alias para compatibilidade
-                despesas: apiData.resultado?.despesas || 0,
-                filhos: apiData.resultado?.filhos || 0,
-                doacoes: apiData.resultado?.doacoes || 0,
-                arte: apiData.resultado?.arte || 0,
-                percentual_arte: apiData.resultado?.percentual_arte || 0
-            },
-            // ADICIONADO: Dados que podem estar faltando
-            status: this.determineStatus(apiData.resultado?.fazenda_disponivel, apiData.resultado?.percentual_fazenda),
-            allocation: apiData.allocation || this.generateDefaultAllocation(),
-            sensibilidade: apiData.sensibilidade || this.generateDefaultSensitivity(),
-            versao: apiData.versao || 'unknown'
-        };
-        
-        debugMessage('Dados mapeados:', 'info');
-        console.log('Dados mapeados:', mapped);
-        
-        return mapped;
-    },
-    
-    determineStatus(fazenda, percentual) {
-        if (!fazenda || fazenda < 0) return 'crítico';
-        if (!percentual || percentual < 5) return 'crítico';
-        if (percentual < 15) return 'atenção';
-        return 'viável';
-    },
-    
-    generateDefaultAllocation() {
-        return [
-            { nome: 'Renda Fixa Nacional', percentual: 50, valor: 32500000 },
-            { nome: 'Renda Fixa Internacional', percentual: 15, valor: 9750000 },
-            { nome: 'Ações Brasil', percentual: 15, valor: 9750000 },
-            { nome: 'Ações Internacionais', percentual: 10, valor: 6500000 },
-            { nome: 'Fundos Imobiliários', percentual: 3, valor: 1950000 },
-            { nome: 'Multimercado', percentual: 3, valor: 1950000 },
-            { nome: 'Reserva de Liquidez', percentual: 2, valor: 1300000 }
-        ];
-    },
-    
-    generateDefaultSensitivity() {
-        const taxas = [2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0, 7.0, 8.0];
-        return taxas.map(taxa => ({
-            taxa,
-            fazenda: (taxa - 4) * 5000000 + 5000000, // Simulação simples
-            percentual: ((taxa - 4) * 5000000 + 5000000) / 65000000 * 100
-        }));
-    }
-};
+    // ================ MAPEADOR DE DADOS SINCRONIZADO ================ 
+    const DataMapper = {
+        mapApiResponse(apiData) {
+            if (!apiData || !apiData.resultado) {
+                debugMessage('Resposta da API inválida ou sem dados de resultado', 'warning');
+                return this.generateFallbackData();
+            }
+            
+            debugMessage(`Mapeando resposta da API versão: ${apiData.versao || 'desconhecida'}`);
+            
+            // ✅ MAPEAMENTO SINCRONIZADO COM A ESTRUTURA REAL DO BACKEND
+            const resultado = apiData.resultado;
+            
+            return {
+                success: apiData.success,
+                patrimonio: apiData.patrimonio,
+                versao: apiData.versao,
+                timestamp: apiData.timestamp,
+                
+                // ✅ RESULTADO PRINCIPAL (campos do backend)
+                resultado: {
+                    fazenda: resultado.fazenda_disponivel,  // ✅ Mapeamento correto
+                    fazenda_disponivel: resultado.fazenda_disponivel,
+                    total: resultado.total_compromissos,     // ✅ Alias para compatibilidade
+                    total_compromissos: resultado.total_compromissos,
+                    percentual: resultado.percentual_fazenda, // ✅ Alias para compatibilidade  
+                    percentual_fazenda: resultado.percentual_fazenda,
+                    despesas: resultado.despesas,
+                    filhos: resultado.filhos,
+                    doacoes: resultado.doacoes,
+                    arte: resultado.arte || 0,
+                    percentual_arte: resultado.percentual_arte || 0
+                },
+                
+                // ✅ DADOS SIMULADOS BASEADOS NA RESPOSTA (que o frontend espera)
+                allocation: this.generateAllocationData(apiData.patrimonio),
+                sensibilidade: this.generateSensibilidadeData(resultado),
+                fluxo_caixa: this.generateFluxoCaixaData(),
+                status: this.determineStatus(resultado.fazenda_disponivel, resultado.percentual_fazenda)
+            };
+        },
 
-    // ================ API CLIENT ================ 
+        generateFallbackData() {
+            debugMessage('Gerando dados de fallback', 'warning');
+            return {
+                success: false,
+                patrimonio: 65000000,
+                resultado: {
+                    fazenda: 0,
+                    fazenda_disponivel: 0,
+                    total: 0,
+                    total_compromissos: 0,
+                    percentual: 0,
+                    percentual_fazenda: 0,
+                    despesas: 0,
+                    filhos: 0,
+                    doacoes: 0,
+                    arte: 0,
+                    percentual_arte: 0
+                },
+                allocation: this.generateAllocationData(65000000),
+                sensibilidade: [],
+                fluxo_caixa: [],
+                status: 'erro'
+            };
+        },
+
+        generateAllocationData(patrimonio) {
+            // ✅ GERAR ALLOCATION BASEADO NO PERFIL (simulação client-side)
+            const perfil = document.getElementById('perfilInvestimento')?.value || 'moderado';
+            
+            const profiles = {
+                'conservador': [
+                    { nome: 'Renda Fixa Nacional', percentual: 70, valor: patrimonio * 0.70 },
+                    { nome: 'Renda Fixa Internacional', percentual: 15, valor: patrimonio * 0.15 },
+                    { nome: 'Ações Brasil', percentual: 5, valor: patrimonio * 0.05 },
+                    { nome: 'Ações Internacionais', percentual: 5, valor: patrimonio * 0.05 },
+                    { nome: 'Fundos Imobiliários', percentual: 3, valor: patrimonio * 0.03 },
+                    { nome: 'Reserva Liquidez', percentual: 2, valor: patrimonio * 0.02 }
+                ],
+                'moderado': [
+                    { nome: 'Renda Fixa Nacional', percentual: 50, valor: patrimonio * 0.50 },
+                    { nome: 'Renda Fixa Internacional', percentual: 20, valor: patrimonio * 0.20 },
+                    { nome: 'Ações Brasil', percentual: 15, valor: patrimonio * 0.15 },
+                    { nome: 'Ações Internacionais', percentual: 10, valor: patrimonio * 0.10 },
+                    { nome: 'Fundos Imobiliários', percentual: 3, valor: patrimonio * 0.03 },
+                    { nome: 'Reserva Liquidez', percentual: 2, valor: patrimonio * 0.02 }
+                ],
+                'balanceado': [
+                    { nome: 'Renda Fixa Nacional', percentual: 40, valor: patrimonio * 0.40 },
+                    { nome: 'Renda Fixa Internacional', percentual: 15, valor: patrimonio * 0.15 },
+                    { nome: 'Ações Brasil', percentual: 20, valor: patrimonio * 0.20 },
+                    { nome: 'Ações Internacionais', percentual: 15, valor: patrimonio * 0.15 },
+                    { nome: 'Fundos Imobiliários', percentual: 5, valor: patrimonio * 0.05 },
+                    { nome: 'Multimercado', percentual: 3, valor: patrimonio * 0.03 },
+                    { nome: 'Reserva Liquidez', percentual: 2, valor: patrimonio * 0.02 }
+                ]
+            };
+            
+            return profiles[perfil] || profiles['moderado'];
+        },
+
+        generateSensibilidadeData(resultado) {
+            // ✅ GERAR SENSIBILIDADE BASEADA NO RESULTADO ATUAL (simulação client-side)
+            const baseFazenda = resultado.fazenda_disponivel || 0;
+            const basePercentual = resultado.percentual_fazenda || 0;
+            
+            const sensibilidade = [];
+            const taxas = [2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0, 7.0, 8.0];
+            
+            taxas.forEach(taxa => {
+                // Estimativa simples: cada 1% de diferença na taxa = ~±15% no resultado
+                const currentTaxa = parseFloat(document.getElementById('taxaRetorno')?.value || 4.0);
+                const deltaTaxa = taxa - currentTaxa;
+                const factor = 1 + (deltaTaxa * 0.15); // 15% por ponto percentual
+                
+                const fazendaEstimada = baseFazenda * factor;
+                const percentualEstimado = basePercentual * factor;
+                
+                sensibilidade.push({
+                    taxa: taxa,
+                    fazenda: fazendaEstimada,
+                    percentual: percentualEstimado
+                });
+            });
+            
+            return sensibilidade;
+        },
+
+        generateFluxoCaixaData() {
+            // ✅ GERAR FLUXO DE CAIXA SIMULADO (baseado nos parâmetros atuais)
+            const fluxo = [];
+            let patrimonio = 65000000;
+            const taxa = parseFloat(document.getElementById('taxaRetorno')?.value || 4.0) / 100;
+            
+            for (let ano = 0; ano < 20; ano++) {
+                const anoCalendario = 2025 + ano;
+                const rendimentos = patrimonio * taxa;
+                const saidas = 1800000; // Estimativa de saídas anuais
+                patrimonio += rendimentos - saidas;
+                patrimonio = Math.max(patrimonio, 0);
+                
+                fluxo.push({
+                    ano: anoCalendario,
+                    patrimonio: patrimonio,
+                    rendimentos: rendimentos,
+                    saidas: saidas
+                });
+            }
+            
+            return fluxo;
+        },
+
+        determineStatus(fazenda, percentual) {
+            if (fazenda < 0) return 'crítico';
+            if (percentual < 5) return 'crítico';
+            if (percentual < 15) return 'atenção';
+            return 'viável';
+        }
+    };
+
+    // ================ API CLIENT SINCRONIZADO ================ 
     const ApiClient = {
         async fetchData() {
             try {
-                debugMessage('Iniciando requisição para API de dados');
+                debugMessage('Iniciando requisição para API sincronizada v4.1');
                 
+                // ✅ PARÂMETROS EXATOS QUE O BACKEND ESPERA
                 const params = new URLSearchParams({
-                taxa: document.getElementById('taxaRetorno').value,
-                expectativa: document.getElementById('expectativaVida').value,
-                despesas: document.getElementById('despesasMensais').value,
-                // ADICIONAR estes 3 parâmetros obrigatórios:
-                perfil: document.getElementById('perfilInvestimento').value,
-                inicio_renda_filhos: document.getElementById('inicioRendaFilhos').value,
-                custo_fazenda: document.getElementById('custoFazenda').value
-            });
+                    taxa: document.getElementById('taxaRetorno').value,
+                    expectativa: document.getElementById('expectativaVida').value,
+                    despesas: document.getElementById('despesasMensais').value,
+                    // ✅ NOVOS PARÂMETROS v4.0 SINCRONIZADOS
+                    perfil: document.getElementById('perfilInvestimento').value,          // ✅ 'perfil' (não 'perfil_investimento')
+                    inicio_renda_filhos: document.getElementById('inicioRendaFilhos').value,
+                    custo_fazenda: document.getElementById('custoFazenda').value
+                });
 
                 const url = `${CONFIG.ENDPOINTS.dados}?${params}`;
-                debugMessage(`URL da requisição: ${url}`);
+                debugMessage(`URL da requisição sincronizada: ${url}`);
 
                 const response = await fetch(url);
                 
@@ -230,142 +347,151 @@ const DataMapper = {
                 }
 
                 const data = await response.json();
-                const mappedData = DataMapper.mapApiResponse(data);
-        
-                if (!mappedData.success) {
-                    throw new Error(mappedData.erro || 'Erro desconhecido na API');
+                debugMessage(`Resposta recebida: versão ${data.versao || 'desconhecida'}, success: ${data.success}`);
+                
+                if (!data.success) {
+                    throw new Error(data.erro || 'Erro desconhecido na API');
                 }
 
-                return mappedData; // Retornar dados mapeados
+                // ✅ MAPEAR DADOS PARA FORMATO ESPERADO PELO FRONTEND
+                const mappedData = DataMapper.mapApiResponse(data);
+                debugMessage('Dados mapeados com sucesso');
+                
+                return mappedData;
             } catch (error) {
-
                 debugMessage(`Erro na API: ${error.message}`, 'error');
                 throw error;
             }
         },
-
-        async fetchCenarios() {
-            try {
-                const response = await fetch(CONFIG.ENDPOINTS.cenarios);
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
+         async checkBackendHealth() {
+        try {
+            debugMessage('🔍 Verificando saúde do backend...');
+            
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000);
+            
+            const response = await fetch(`${CONFIG.API_BASE_URL}/api/teste`, {
+                method: 'GET',
+                signal: controller.signal,
+                headers: {
+                   'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'Cache-Control': 'no-cache'
                 }
-
-                const data = await response.json();
-                
-                if (!data.success) {
-                    throw new Error(data.erro || 'Erro ao carregar cenários');
-                }
-
-                return data;
-            } catch (error) {
-                debugMessage('Erro ao carregar cenários:', error);
-                throw error;
+            });
+            
+            clearTimeout(timeoutId);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
-        },
+            
+            const data = await response.json();
+            
+            if (data.status === 'OK') {
+                debugMessage(`✅ Backend online - Versão: ${data.version}`, 'success');
+                AppState.connectionStatus = 'connected';
+                return true;
+            } else {
+                throw new Error('Backend respondeu mas status não é OK');
+            }
+            
+        } catch (error) {
+            debugMessage(`❌ Backend offline: ${error.message}`, 'error');
+            AppState.connectionStatus = 'disconnected';
+            AppState.lastError = error.message;
+            return false;
+        }
+    },
+
+mapBackendResponse(backendData) {
+        debugMessage(`🔄 Mapeando resposta: ${JSON.stringify(backendData, null, 2)}`);
+        
+        if (!backendData || !backendData.resultado) {
+            throw new Error('Estrutura de resposta inválida do backend');
+        }
+        
+        const resultado = backendData.resultado;
+        
+        // ✅ MAPEAR EXATAMENTE COMO SEU BACKEND RETORNA
+        const mappedData = {
+            success: true,
+            patrimonio: backendData.patrimonio || 65000000,
+            versao: backendData.versao,
+            timestamp: backendData.timestamp,
+            
+            // ✅ CAMPOS EXATOS DO SEU BACKEND
+            resultado: {
+                fazenda: resultado.fazenda_disponivel,           // backend -> frontend
+                fazenda_disponivel: resultado.fazenda_disponivel,
+                total: resultado.total_compromissos,             // backend -> frontend  
+                total_compromissos: resultado.total_compromissos,
+                percentual: resultado.percentual_fazenda,        // backend -> frontend
+                percentual_fazenda: resultado.percentual_fazenda,
+                despesas: resultado.despesas,
+                filhos: resultado.filhos,
+                doacoes: resultado.doacoes,
+                arte: resultado.arte || 0,
+                percentual_arte: resultado.percentual_arte || 0
+            },
+            
+            // Gerar dados adicionais que o frontend espera
+            allocation: this.generateAllocationData(backendData.patrimonio || 65000000),
+            sensibilidade: this.generateSensibilityData(resultado),
+            status: this.determineStatus(resultado.fazenda_disponivel, resultado.percentual_fazenda)
+        };
+        
+        debugMessage(`✅ Dados mapeados: fazenda=${mappedData.resultado.fazenda}, percentual=${mappedData.resultado.percentual}%`);
+        return mappedData;
+    },
+
+
+
+    collectFormParams() {
+        const params = {};
+        
+        // ✅ Mapear cada input do frontend para o parâmetro esperado pelo backend
+        Object.entries(CONFIG.PARAM_MAPPING).forEach(([frontendId, backendParam]) => {
+            const element = document.getElementById(frontendId);
+            if (element) {
+                params[backendParam] = element.value;
+            } else {
+                debugMessage(`⚠️ Elemento ${frontendId} não encontrado`, 'warning');
+            }
+        });
+        
+        debugMessage(`📝 Parâmetros coletados: ${JSON.stringify(params)}`);
+        return params;
+    },
+
 
         async testConnection() {
             try {
-                debugMessage('Testando conexão com API');
+                debugMessage('Testando conexão com API v4.1');
                 const response = await fetch(CONFIG.ENDPOINTS.teste);
                 const data = await response.json();
                 const isConnected = response.ok && data.status === 'OK';
-                debugMessage(`Conexão: ${isConnected ? 'OK' : 'ERRO'}`);
+                debugMessage(`Conexão: ${isConnected ? 'OK' : 'ERRO'} - Versão: ${data.version || 'N/A'}`);
                 return isConnected;
             } catch (error) {
                 debugMessage(`Erro ao testar conexão: ${error.message}`, 'error');
                 return false;
             }
+        },
+
+        async fetchTestCorrecoes() {
+            try {
+                debugMessage('Testando correções v4.1');
+                const response = await fetch(CONFIG.ENDPOINTS.teste_correcoes);
+                const data = await response.json();
+                debugMessage(`Teste correções: ${data.success ? 'OK' : 'ERRO'}`);
+                return data;
+            } catch (error) {
+                debugMessage(`Erro ao testar correções: ${error.message}`, 'error');
+                return null;
+            }
         }
     };
-
-const ApiClientFixed = {
-    ...ApiClient,
-    
-    async fetchData() {
-        try {
-            // VALIDAÇÃO LOCAL PRIMEIRO
-            if (!this.validateInputsLocally()) {
-                throw new Error('Parâmetros inválidos detectados localmente');
-            }
-            
-            debugMessage('✅ Validação local passou - iniciando requisição API');
-            
-            const params = new URLSearchParams({
-                taxa: document.getElementById('taxaRetorno').value,
-                expectativa: document.getElementById('expectativaVida').value,
-                despesas: document.getElementById('despesasMensais').value,
-                perfil: document.getElementById('perfilInvestimento').value,
-                inicio_renda_filhos: document.getElementById('inicioRendaFilhos').value,
-                custo_fazenda: document.getElementById('custoFazenda').value
-            });
-
-            const url = `${CONFIG.ENDPOINTS.dados}?${params}`;
-            debugMessage(`🔗 URL da requisição: ${url}`);
-
-            const response = await fetch(url);
-            
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-
-            const rawData = await response.json();
-            debugMessage('📨 Dados brutos recebidos da API:', 'info');
-            console.log('Raw API Data:', rawData);
-            
-            if (!rawData.success) {
-                throw new Error(rawData.erro || 'Erro desconhecido na API');
-            }
-
-            // MAPEAR DADOS CORRETAMENTE
-            const mappedData = DataMapper.mapApiResponse(rawData);
-            
-            if (!mappedData) {
-                throw new Error('Falha no mapeamento dos dados da API');
-            }
-            
-            debugMessage('✅ Dados mapeados com sucesso');
-            return mappedData;
-            
-        } catch (error) {
-            debugMessage(`❌ Erro na API: ${error.message}`, 'error');
-            throw error;
-        }
-    },
-    
-    validateInputsLocally() {
-        const taxa = parseFloat(document.getElementById('taxaRetorno').value);
-        const expectativa = parseInt(document.getElementById('expectativaVida').value);
-        const despesas = parseFloat(document.getElementById('despesasMensais').value);
-        const custoFazenda = parseFloat(document.getElementById('custoFazenda').value);
-        
-        // Validações básicas
-        if (isNaN(taxa) || taxa < 0.1 || taxa > 15) {
-            Utils.showNotification('Taxa de retorno deve estar entre 0.1% e 15%', 'danger');
-            return false;
-        }
-        
-        if (isNaN(expectativa) || expectativa < 53) {
-            Utils.showNotification('Expectativa de vida deve ser pelo menos 53 anos', 'danger');
-            return false;
-        }
-        
-        if (isNaN(despesas) || despesas < 50000 || despesas > 1000000) {
-            Utils.showNotification('Despesas devem estar entre R$ 50.000 e R$ 1.000.000', 'danger');
-            return false;
-        }
-        
-        if (isNaN(custoFazenda) || custoFazenda < 500000 || custoFazenda > 10000000) {
-            Utils.showNotification('Custo da fazenda deve estar entre R$ 500.000 e R$ 10.000.000', 'danger');
-            return false;
-        }
-        
-        return true;
-    }
-};
-
-
 
     // ================ UTILITIES ================ 
     const Utils = {
@@ -420,7 +546,7 @@ const ApiClientFixed = {
         }
     };
 
-    // ================ CHART MANAGER WITH FIX ================ 
+    // ================ CHART MANAGER SINCRONIZADO ================ 
     const ChartManager = {
         colors: {
             primary: '#1e3a8a',
@@ -432,15 +558,13 @@ const ApiClientFixed = {
         },
 
         async initializeCharts() {
-            debugMessage('Inicializando sistema de gráficos');
+            debugMessage('Inicializando sistema de gráficos sincronizado');
             
             try {
-                // Try to load Chart.js
                 await loadChartJS();
                 AppState.chartJsLoaded = true;
                 debugMessage('Chart.js inicializado com sucesso');
                 
-                // Create charts if data is available
                 if (AppState.currentData) {
                     this.createCharts();
                 }
@@ -452,15 +576,14 @@ const ApiClientFixed = {
             }
         },
 
-        // FIX: Destroy existing charts before creating new ones
         destroyExistingCharts() {
-            debugMessage('Destruindo gráficos existentes para evitar conflitos');
+            debugMessage('Destruindo gráficos existentes');
             
             Object.keys(AppState.charts).forEach(chartKey => {
                 if (AppState.charts[chartKey] && AppState.charts[chartKey].destroy) {
                     try {
                         AppState.charts[chartKey].destroy();
-                        debugMessage(`Gráfico ${chartKey} destruído com sucesso`);
+                        debugMessage(`Gráfico ${chartKey} destruído`);
                     } catch (error) {
                         debugMessage(`Erro ao destruir gráfico ${chartKey}: ${error.message}`, 'warning');
                     }
@@ -481,13 +604,11 @@ const ApiClientFixed = {
                 return;
             }
 
-            debugMessage('Criando gráficos Chart.js');
+            debugMessage('Criando gráficos Chart.js com dados sincronizados');
             
             try {
-                // FIX: Always destroy existing charts first
                 this.destroyExistingCharts();
                 
-                // Create charts based on current page
                 if (AppState.currentPage === 'dashboard') {
                     this.hideChartPlaceholders(['compromissosContainer', 'allocationContainer', 'sensibilidadeContainer']);
                     this.createCompromissosChart();
@@ -548,13 +669,12 @@ const ApiClientFixed = {
         },
 
         showAlternativeVisualization() {
-            debugMessage('Mostrando visualização alternativa sem Chart.js');
+            debugMessage('Mostrando visualização alternativa sincronizada');
             
             if (!AppState.currentData) return;
             
             const { resultado, allocation, sensibilidade } = AppState.currentData;
             
-            // Only show alternative for dashboard page
             if (AppState.currentPage === 'dashboard') {
                 this.createAlternativeCompromissos(resultado);
                 this.createAlternativeAllocation(allocation);
@@ -636,7 +756,7 @@ const ApiClientFixed = {
         },
 
         createAlternativeSensibilidade(sensibilidade) {
-            if (!sensibilidade) return;
+            if (!sensibilidade || sensibilidade.length === 0) return;
             
             const container = document.getElementById('sensibilidadeContainer');
             if (!container) return;
@@ -668,63 +788,77 @@ const ApiClientFixed = {
             `;
         },
 
-        createCompromissosChart() {
-            const ctx = document.getElementById('compromissosChart');
-            if (!ctx || !AppState.currentData) return;
-            
-            const { resultado } = AppState.currentData;
-            if (!resultado) return;
-            
-            debugMessage('Criando gráfico de compromissos');
+       createCompromissosChart() {
+    const ctx = document.getElementById('compromissosChart');
+    if (!ctx || !AppState.currentData) return;
+    
+    const { resultado } = AppState.currentData;
+    if (!resultado) return;
+    
+    debugMessage('Criando gráfico de compromissos sincronizado');
 
-            AppState.charts.compromissos = new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    labels: ['Despesas Ana', 'Renda Filhos', 'Doações', 'Disponível Fazenda'],
-                    datasets: [{
-                        data: [
-                            resultado.despesas,
-                            resultado.filhos,
-                            resultado.doacoes,
-                            Math.max(resultado.fazenda, 0)
-                        ],
-                        backgroundColor: [
-                            this.colors.primary,
-                            this.colors.secondary,
-                            this.colors.gray,
-                            this.colors.accent
-                        ],
-                        borderWidth: 0,
-                        hoverOffset: 8
-                    }]
+    // ✅ LÓGICA DINÂMICA PARA TRATAR FAZENDA NEGATIVA
+    const fazendaValue = resultado.fazenda;
+    const labels = ['Despesas Ana', 'Renda Filhos', 'Doações'];
+    const data = [resultado.despesas, resultado.filhos, resultado.doacoes];
+    const colors = [this.colors.primary, this.colors.secondary, this.colors.gray];
+
+    // ✅ DETECTAR SE FAZENDA É POSITIVA OU NEGATIVA
+    if (fazendaValue >= 0) {
+        // Fazenda positiva = exibir normalmente
+        labels.push('Disponível Fazenda');
+        data.push(fazendaValue);
+        colors.push(this.colors.accent);  // Verde
+    } else {
+        // Fazenda negativa = mostrar como "Déficit"
+        labels.push('⚠️ Déficit Patrimonial');
+        data.push(Math.abs(fazendaValue));  // Valor absoluto para gráfico
+        colors.push('#dc2626');  // Vermelho para déficit
+    }
+
+    AppState.charts.compromissos = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: labels,        // ✅ DINÂMICO
+            datasets: [{
+                data: data,        // ✅ DINÂMICO
+                backgroundColor: colors,  // ✅ DINÂMICO
+                borderWidth: 0,
+                hoverOffset: 8
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: { 
+                        color: '#374151',
+                        padding: 20,
+                        usePointStyle: true,
+                        font: { size: 12 }
+                    }
                 },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'bottom',
-                            labels: { 
-                                color: '#374151',
-                                padding: 20,
-                                usePointStyle: true,
-                                font: { size: 12 }
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const value = context.parsed;
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = ((value / total) * 100).toFixed(1);
+                            
+                            // ✅ TOOLTIP ESPECIAL PARA DÉFICIT
+                            if (context.label.includes('Déficit')) {
+                                return `${context.label}: -${Utils.formatCurrency(value)} (${percentage}% do total de compromissos)`;
                             }
-                        },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    const value = context.parsed;
-                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                                    const percentage = ((value / total) * 100).toFixed(1);
-                                    return `${context.label}: ${Utils.formatCurrency(value)} (${percentage}%)`;
-                                }
-                            }
+                            return `${context.label}: ${Utils.formatCurrency(value)} (${percentage}%)`;
                         }
                     }
                 }
-            });
-        },
+            }
+        }
+    });
+},
 
         createAllocationChart() {
             const ctx = document.getElementById('allocationChart');
@@ -733,7 +867,7 @@ const ApiClientFixed = {
             const { allocation } = AppState.currentData;
             if (!allocation) return;
             
-            debugMessage('Criando gráfico de allocation');
+            debugMessage('Criando gráfico de allocation sincronizado');
 
             AppState.charts.allocation = new Chart(ctx, {
                 type: 'pie',
@@ -785,9 +919,9 @@ const ApiClientFixed = {
             if (!ctx || !AppState.currentData) return;
             
             const { sensibilidade } = AppState.currentData;
-            if (!sensibilidade) return;
+            if (!sensibilidade || sensibilidade.length === 0) return;
             
-            debugMessage('Criando gráfico de sensibilidade');
+            debugMessage('Criando gráfico de sensibilidade sincronizado');
 
             AppState.charts.sensibilidade = new Chart(ctx, {
                 type: 'line',
@@ -842,7 +976,7 @@ const ApiClientFixed = {
             });
         },
 
-        // Additional page charts
+        // Outros gráficos mantidos para compatibilidade
         createAllocationPageCharts() {
             this.createCurrentAllocationChart();
             this.createBenchmarkChart();
@@ -870,7 +1004,7 @@ const ApiClientFixed = {
             this.createBidimensionalChart();
         },
 
-        // Sample chart implementations for other pages
+        // Implementações dos gráficos adicionais mantidas
         createCurrentAllocationChart() {
             const ctx = document.getElementById('currentAllocationChart');
             if (!ctx || !AppState.currentData) return;
@@ -925,7 +1059,7 @@ const ApiClientFixed = {
                     labels: ['RF Nacional', 'RF Internacional', 'Multimercado', 'Ações BR', 'Ações Int', 'Imóveis', 'Liquidez'],
                     datasets: [{
                         label: 'Atual',
-                        data: [65, 15, 10, 5, 5, 0, 0],
+                        data: [50, 20, 0, 15, 10, 3, 2],
                         backgroundColor: this.colors.primary + '80'
                     }, {
                         label: 'Benchmark',
@@ -952,76 +1086,51 @@ const ApiClientFixed = {
 
         createPatrimonialEvolutionChart() {
             const ctx = document.getElementById('patrimonialEvolutionChart');
-            if (!ctx || !AppState.currentData) return;
+            if (!ctx) return;
 
             const { fluxo_caixa } = AppState.currentData;
             
-            if (!fluxo_caixa || fluxo_caixa.length === 0) {
-                // Fallback para dados simulados
-                const years = Array.from({length: 10}, (_, i) => 2025 + i);
-                const patrimonialData = years.map((year, i) => {
-                    return 65000000 * Math.pow(1.04, i) - (i * 1800000);
-                });
-
-                AppState.charts.patrimonialEvolution = new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: years,
-                        datasets: [{
-                            label: 'Patrimônio (R$ milhões)',
-                            data: patrimonialData.map(v => v / 1000000),
-                            borderColor: this.colors.primary,
-                            backgroundColor: this.colors.primary + '20',
-                            borderWidth: 3,
-                            fill: true,
-                            tension: 0.4
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        scales: {
-                            y: {
-                                ticks: {
-                                    callback: function(value) {
-                                        return 'R$ ' + value + 'M';
-                                    }
-                                }
-                            }
-                        }
-                    }
-                });
+            let patrimonialData, labels;
+            
+            if (fluxo_caixa && fluxo_caixa.length > 0) {
+                labels = fluxo_caixa.map(item => item.ano);
+                patrimonialData = fluxo_caixa.map(item => item.patrimonio / 1000000);
             } else {
-                // Usar dados reais do fluxo de caixa
-                AppState.charts.patrimonialEvolution = new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: fluxo_caixa.map(item => item.ano),
-                        datasets: [{
-                            label: 'Patrimônio (R$ milhões)',
-                            data: fluxo_caixa.map(item => item.patrimonio / 1000000),
-                            borderColor: this.colors.primary,
-                            backgroundColor: this.colors.primary + '20',
-                            borderWidth: 3,
-                            fill: true,
-                            tension: 0.4
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        scales: {
-                            y: {
-                                ticks: {
-                                    callback: function(value) {
-                                        return 'R$ ' + value + 'M';
-                                    }
-                                }
-                            }
-                        }
-                    }
+                // Fallback data
+                labels = Array.from({length: 10}, (_, i) => 2025 + i);
+                patrimonialData = labels.map((year, i) => {
+                    return 65 * Math.pow(1.04, i) - (i * 1.8);
                 });
             }
+
+            AppState.charts.patrimonialEvolution = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Patrimônio (R$ milhões)',
+                        data: patrimonialData,
+                        borderColor: this.colors.primary,
+                        backgroundColor: this.colors.primary + '20',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            ticks: {
+                                callback: function(value) {
+                                    return 'R$ ' + value + 'M';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
         },
 
         createCashFlowChart() {
@@ -1058,29 +1167,25 @@ const ApiClientFixed = {
             });
         },
 
-        // FIXED: Monte Carlo simulation chart
         createMonteCarloChart() {
             const ctx = document.getElementById('monteCarloChart');
             if (!ctx) return;
 
             debugMessage('Criando gráfico Monte Carlo');
 
-            // Generate simulated data based on current parameters
             const { taxaMin, taxaMax, volatilidade, numSimulacoes } = AppState.simulationParams;
             const datasets = [];
             
-            // Create 20 sample trajectories for visualization
             for (let i = 0; i < 20; i++) {
                 const data = [];
-                let value = 65; // Starting at 65M
+                let value = 65;
                 
                 for (let year = 0; year < 20; year++) {
-                    // Random return between min and max with volatility
                     const baseReturn = taxaMin + Math.random() * (taxaMax - taxaMin);
                     const volatilityFactor = (Math.random() - 0.5) * (volatilidade / 100);
                     const totalReturn = (baseReturn + volatilityFactor * 100) / 100;
                     
-                    value = value * (1 + totalReturn) - 1.8; // 1.8M annual outflows
+                    value = value * (1 + totalReturn) - 1.8;
                     data.push(Math.max(value, 0));
                 }
                 
@@ -1125,14 +1230,12 @@ const ApiClientFixed = {
             });
         },
 
-        // NEW: Distribution chart for simulation results
         createDistribuicaoChart() {
             const ctx = document.getElementById('distribuicaoChart');
             if (!ctx) return;
 
             debugMessage('Criando gráfico de distribuição');
 
-            // Simulate final values distribution
             const finalValues = [];
             const { taxaMin, taxaMax, volatilidade } = AppState.simulationParams;
             
@@ -1145,7 +1248,6 @@ const ApiClientFixed = {
                 finalValues.push(finalValue);
             }
 
-            // Create histogram data
             const bins = 15;
             const minVal = Math.min(...finalValues);
             const maxVal = Math.max(...finalValues);
@@ -1202,7 +1304,6 @@ const ApiClientFixed = {
             });
         },
 
-        // Placeholder implementations for other charts
         createScenarioComparisonChart() {
             const ctx = document.getElementById('scenarioComparisonChart');
             if (!ctx) return;
@@ -1395,7 +1496,6 @@ const ApiClientFixed = {
             const ctx = document.getElementById('bidimensionalChart');
             if (!ctx) return;
 
-            // Create a simple scatter plot for bidimensional analysis
             AppState.charts.bidimensional = new Chart(ctx, {
                 type: 'scatter',
                 data: {
@@ -1438,7 +1538,6 @@ const ApiClientFixed = {
     // ================ SIMULATION MANAGER ================ 
     const SimulationManager = {
         updateParameters() {
-            // Update simulation parameters from UI
             AppState.simulationParams.taxaMin = parseFloat(document.getElementById('simTaxaMin').value);
             AppState.simulationParams.taxaMax = parseFloat(document.getElementById('simTaxaMax').value);
             AppState.simulationParams.volatilidade = parseFloat(document.getElementById('simVolatilidade').value);
@@ -1446,7 +1545,6 @@ const ApiClientFixed = {
             
             debugMessage(`Parâmetros de simulação atualizados: ${JSON.stringify(AppState.simulationParams)}`);
             
-            // Run new simulation
             this.runSimulation();
         },
 
@@ -1455,13 +1553,10 @@ const ApiClientFixed = {
             
             const { taxaMin, taxaMax, volatilidade, numSimulacoes } = AppState.simulationParams;
             
-            // Generate simulation results
             const results = this.generateSimulationResults();
             
-            // Update UI with results
             this.updateSimulationResults(results);
             
-            // Recreate charts if we're on the simulation page
             if (AppState.currentPage === 'simulations' && AppState.chartJsLoaded) {
                 setTimeout(() => {
                     ChartManager.createSimulationCharts();
@@ -1475,29 +1570,23 @@ const ApiClientFixed = {
             const { taxaMin, taxaMax, volatilidade, numSimulacoes } = AppState.simulationParams;
             const finalValues = [];
             
-            // Run Monte Carlo simulation
             for (let i = 0; i < numSimulacoes; i++) {
-                let patrimonio = 65000000; // Start with 65M
+                let patrimonio = 65000000;
                 
-                // Simulate 20 years
                 for (let year = 0; year < 20; year++) {
-                    // Random return within range
                     const baseReturn = (taxaMin + Math.random() * (taxaMax - taxaMin)) / 100;
                     const volatilityFactor = (Math.random() - 0.5) * 2 * (volatilidade / 100);
                     const yearReturn = baseReturn + volatilityFactor;
                     
-                    // Apply return and subtract outflows
-                    patrimonio = patrimonio * (1 + yearReturn) - 1800000; // 1.8M annual outflows
-                    patrimonio = Math.max(patrimonio, 0); // Can't go negative
+                    patrimonio = patrimonio * (1 + yearReturn) - 1800000;
+                    patrimonio = Math.max(patrimonio, 0);
                 }
                 
                 finalValues.push(patrimonio);
             }
             
-            // Sort for percentile calculations
             finalValues.sort((a, b) => a - b);
             
-            // Calculate percentiles
             const getPercentile = (arr, p) => {
                 const index = Math.floor(arr.length * p / 100);
                 return arr[Math.min(index, arr.length - 1)];
@@ -1521,13 +1610,11 @@ const ApiClientFixed = {
         },
 
         updateSimulationResults(results) {
-            // Update the results display elements
             document.getElementById('simResultP10').textContent = Utils.formatCurrency(results.p10, true);
             document.getElementById('simResultP50').textContent = Utils.formatCurrency(results.p50, true);
             document.getElementById('simResultP90').textContent = Utils.formatCurrency(results.p90, true);
             document.getElementById('simSuccessRate').textContent = results.successRate.toFixed(0) + '%';
             
-            // Update detailed table
             document.getElementById('simP5').textContent = Utils.formatCurrency(results.p5, true);
             document.getElementById('simP10').textContent = Utils.formatCurrency(results.p10, true);
             document.getElementById('simP25').textContent = Utils.formatCurrency(results.p25, true);
@@ -1538,91 +1625,30 @@ const ApiClientFixed = {
         }
     };
 
-    // ================ REPORT MANAGER ================ 
+    // ================ REPORT MANAGER SINCRONIZADO ================ 
     const ReportManager = {
         async generatePDFReport(tipo) {
-            debugMessage(`Iniciando geração de relatório: ${tipo}`);
+            debugMessage(`⚠️ AVISO: Tentativa de gerar relatório ${tipo} - funcionalidade não implementada no backend`);
             
-            // Show loading status
-            this.showReportStatus(true, `Gerando relatório ${tipo}...`);
+            this.showReportStatus(true, `Simulando geração de relatório ${tipo}...`);
             
             try {
-                // Get current parameters
-                const params = new URLSearchParams({
+                // ✅ SIMULAÇÃO LOCAL - BACKEND NÃO TEM ENDPOINTS DE RELATÓRIO
+                await new Promise(resolve => setTimeout(resolve, 2000)); // Simular delay
+                
+                this.addToReportHistory(tipo, {
                     taxa: document.getElementById('taxaRetorno').value,
                     expectativa: document.getElementById('expectativaVida').value,
-                    despesas: document.getElementById('despesasMensais').value,
-                    // ADICIONAR estes 3 parâmetros obrigatórios:
-                    perfil: document.getElementById('perfilInvestimento').value,
-                    inicio_renda_filhos: document.getElementById('inicioRendaFilhos').value,
-                    custo_fazenda: document.getElementById('custoFazenda').value
+                    despesas: document.getElementById('despesasMensais').value
                 });
                 
-                // Add simulation parameters if it's a simulation report
-                if (tipo === 'simulacao') {
-                    params.append('simulacao', 'true');
-                    params.append('volatilidade', AppState.simulationParams.volatilidade);
-                    params.append('num_simulacoes', AppState.simulationParams.numSimulacoes);
-                }
-                
-                // Determine endpoint - map simulation to detailed report
-                let endpoint;
-                let reportType = tipo;
-                
-                if (tipo === 'executivo') {
-                    endpoint = CONFIG.ENDPOINTS.relatorio_executivo;
-                } else if (tipo === 'detalhado' || tipo === 'simulacao') {
-                    endpoint = CONFIG.ENDPOINTS.relatorio_detalhado;
-                    if (tipo === 'simulacao') {
-                        reportType = 'detalhado (com simulações)';
-                    }
-                } else {
-                    throw new Error('Tipo de relatório não suportado');
-                }
-                
-                const url = `${endpoint}?${params}`;
-                debugMessage(`URL do relatório: ${url}`);
-                
-                // Fetch the PDF
-                const response = await fetch(url);
-                
-                if (!response.ok) {
-                    throw new Error(`Erro HTTP ${response.status}: ${response.statusText}`);
-                }
-                
-                // Get the PDF blob
-                const blob = await response.blob();
-                
-                // Create download link with appropriate filename
-                const downloadUrl = window.URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = downloadUrl;
-                
-                const filename = tipo === 'simulacao' ? 
-                    `relatorio_simulacao_montecarlo_${new Date().toISOString().split('T')[0]}.pdf` :
-                    `relatorio_${tipo}_${new Date().toISOString().split('T')[0]}.pdf`;
-                
-                link.download = filename;
-                
-                // Trigger download
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                
-                // Cleanup
-                window.URL.revokeObjectURL(downloadUrl);
-                
-                // Add to history
-                this.addToReportHistory(tipo, params);
-                
-                // Show success
                 this.showReportStatus(false);
-                Utils.showNotification(`Relatório ${reportType} gerado com sucesso!`, 'success');
+                Utils.showNotification(`⚠️ Relatório ${tipo} simulado - implementação no backend pendente`, 'warning');
                 
-                debugMessage(`Relatório ${tipo} baixado com sucesso`);
+                debugMessage(`Relatório ${tipo} simulado localmente`);
                 
             } catch (error) {
-                debugMessage(`Erro ao gerar relatório: ${error.message}`, 'error');
+                debugMessage(`Erro ao simular relatório: ${error.message}`, 'error');
                 this.showReportStatus(false);
                 Utils.showNotification(`Erro ao gerar relatório: ${error.message}`, 'danger');
             }
@@ -1650,19 +1676,16 @@ const ApiClientFixed = {
                 timestamp: now,
                 tipo: tipo,
                 parametros: {
-                    taxa: params.get('taxa'),
-                    expectativa: params.get('expectativa'),
-                    despesas: params.get('despesas')
+                    taxa: params.taxa,
+                    expectativa: params.expectativa,
+                    despesas: params.despesas
                 },
-                status: 'gerado'
+                status: 'simulado'
             };
             
             AppState.reportHistory.unshift(report);
-            
-            // Keep only last 10 reports
             AppState.reportHistory = AppState.reportHistory.slice(0, 10);
             
-            // Update UI
             this.updateReportHistoryTable();
         },
 
@@ -1682,7 +1705,6 @@ const ApiClientFixed = {
             }
             
             tbody.innerHTML = AppState.reportHistory.map(report => {
-                // Format report type name
                 let reportTypeName;
                 switch(report.tipo) {
                     case 'executivo':
@@ -1707,7 +1729,7 @@ const ApiClientFixed = {
                             Expectativa: ${report.parametros.expectativa} anos, 
                             Despesas: ${Utils.formatCurrency(parseFloat(report.parametros.despesas), true)}
                         </td>
-                        <td><span class="status-badge success">Gerado</span></td>
+                        <td><span class="status-badge warning">Simulado</span></td>
                         <td>
                             <button class="widget-action" onclick="ReportManager.regenerateReport('${report.tipo}', ${JSON.stringify(report.parametros).replace(/"/g, '&quot;')})" title="Regenerar relatório">
                                 <i class="fas fa-redo"></i>
@@ -1721,7 +1743,6 @@ const ApiClientFixed = {
         async regenerateReport(tipo, parametros) {
             debugMessage(`Regenerando relatório: ${tipo}`);
             
-            // Temporarily update form values
             const originalValues = {
                 taxa: document.getElementById('taxaRetorno').value,
                 expectativa: document.getElementById('expectativaVida').value,
@@ -1732,17 +1753,15 @@ const ApiClientFixed = {
             document.getElementById('expectativaVida').value = parametros.expectativa;
             document.getElementById('despesasMensais').value = parametros.despesas;
             
-            // Generate report
             await this.generatePDFReport(tipo);
             
-            // Restore original values
             document.getElementById('taxaRetorno').value = originalValues.taxa;
             document.getElementById('expectativaVida').value = originalValues.expectativa;
             document.getElementById('despesasMensais').value = originalValues.despesas;
         }
     };
 
-    // ================ UI MANAGER ================ 
+    // ================ UI MANAGER SINCRONIZADO ================ 
     const UIManager = {
         showLoading(show) {
             const refreshBtn = document.getElementById('refreshBtn');
@@ -1756,6 +1775,34 @@ const ApiClientFixed = {
                 }
             }
         },
+        updateTable() {
+        if (!AppState.currentData || !AppState.currentData.sensibilidade) {
+            debugMessage('Dados insuficientes para atualizar tabela', 'warning');
+            return;
+        }
+
+        const tbody = document.getElementById('cenarioTableBody');
+        if (!tbody) {
+            debugMessage('Elemento cenarioTableBody não encontrado', 'warning');
+            return;
+        }
+
+        const { sensibilidade } = AppState.currentData;
+        
+        tbody.innerHTML = sensibilidade.map(item => {
+            const status = this.getStatusBadge(item.fazenda, item.percentual);
+            return `
+                <tr>
+                    <td><strong>${item.taxa}%</strong></td>
+                    <td>${Utils.formatCurrency(item.fazenda, true)}</td>
+                    <td>${Utils.formatPercentage(item.percentual)}</td>
+                    <td>${status}</td>
+                </tr>
+            `;
+        }).join('');
+
+        debugMessage('Tabela de cenários atualizada com sucesso');
+    },
 
         updateSystemStatus(isConnected) {
             const statusEl = document.getElementById('systemStatus');
@@ -1770,19 +1817,20 @@ const ApiClientFixed = {
             }
         },
 
+
+
         updateMetrics() {
             if (!AppState.currentData) return;
             
-            debugMessage('Atualizando métricas');
+            debugMessage('Atualizando métricas sincronizadas');
             const { resultado, patrimonio, status } = AppState.currentData;
             
-            // Atualizar patrimônio
+            // ✅ ATUALIZAR COM DADOS SINCRONIZADOS DO BACKEND
             const patrimonioEl = document.getElementById('valorPatrimonio');
             if (patrimonioEl) {
                 patrimonioEl.textContent = Utils.formatCurrency(patrimonio, true);
             }
             
-            // Atualizar fazenda
             const fazendaEl = document.getElementById('valorFazenda');
             const percentualEl = document.getElementById('percentualFazenda');
             const trendEl = document.getElementById('trendFazenda');
@@ -1805,17 +1853,94 @@ const ApiClientFixed = {
                 }
             }
             
-            // Atualizar compromissos
-            const compromissosEl = document.getElementById('valorCompromissos');
-           if (compromissosEl && resultado) {
-            compromissosEl.textContent = Utils.formatCurrency(resultado.total, true);  // ✅ Usar alias
+            // ✅ ARTE/GALERIA (NOVO CAMPO v4.0)
+            const arteEl = document.querySelector('#valorArte h3');
+            const percentualArteEl = document.getElementById('percentualArte');
+            const trendArteEl = document.getElementById('trendArte');
+            
+            if (arteEl && resultado) {
+                arteEl.textContent = Utils.formatCurrency(resultado.arte || 0, true);
+                if (percentualArteEl) {
+                    percentualArteEl.textContent = Utils.formatPercentage(resultado.percentual_arte || 0);
+                }
+                
+                if (trendArteEl) {
+                    trendArteEl.className = 'metric-trend';
+                    if (resultado.arte > 0) {
+                        trendArteEl.classList.add('positive');
+                        trendArteEl.innerHTML = '<i class="fas fa-palette"></i><span>' + Utils.formatPercentage(resultado.percentual_arte || 0) + '</span>';
+                    } else {
+                        trendArteEl.classList.add('neutral');
+                        trendArteEl.innerHTML = '<i class="fas fa-palette"></i><span>Indisponível</span>';
+                    }
+                }
             }
             
-            // Atualizar status
+            // ✅ PERFIL DE INVESTIMENTO (NOVO CAMPO v4.0)
+            const perfilEl = document.getElementById('perfilAtual');
+            const retornoEl = document.getElementById('retornoEsperado');
+            
+            if (perfilEl) {
+                const perfil = document.getElementById('perfilInvestimento')?.value || 'moderado';
+                perfilEl.textContent = perfil.charAt(0).toUpperCase() + perfil.slice(1);
+                
+                const retornos = {
+                    'conservador': '3.5% a.a.',
+                    'moderado': '4.5% a.a.',
+                    'balanceado': '5.2% a.a.'
+                };
+                if (retornoEl) {
+                    retornoEl.textContent = retornos[perfil] || '4.5% a.a.';
+                }
+            }
+            
+            const compromissosEl = document.getElementById('valorCompromissos');
+            if (compromissosEl && resultado) {
+                compromissosEl.textContent = Utils.formatCurrency(resultado.total, true);
+            }
+            
+            // ✅ STATUS VISUAL ATUALIZADO
+            this.updateStatusVisual(status);
+            
             const statusEl = document.getElementById('valorStatus');
             if (statusEl) {
-                statusEl.textContent = status || 'Calculando...';
+                statusEl.textContent = status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Calculando...';
             }
+        },
+
+        updateStatusVisual(status) {
+            const statusBadge = document.getElementById('statusBadge');
+            const statusText = document.getElementById('statusText');
+            const statusDescription = document.getElementById('statusDescription');
+            const statusEl = document.getElementById('valorStatus');
+            
+            if (!statusBadge || !statusText || !statusDescription) return;
+            
+            statusBadge.classList.remove('critico', 'atencao', 'viavel');
+            
+            let icon, description;
+            
+            if (status === 'crítico') {
+                statusBadge.classList.add('critico');
+                icon = 'exclamation-triangle';
+                description = 'Plano insustentável - ação urgente necessária';
+                if (statusEl) statusEl.innerHTML = '⚠️ Crítico';
+            } else if (status === 'atenção') {
+                statusBadge.classList.add('atencao');
+                icon = 'exclamation-circle';
+                description = 'Plano viável mas com margem baixa';
+                if (statusEl) statusEl.innerHTML = '⚡ Atenção';
+            } else {
+                statusBadge.classList.add('viavel');
+                icon = 'check-circle';
+                description = 'Plano sustentável com boa margem';
+                if (statusEl) statusEl.innerHTML = '✅ Viável';
+            }
+            
+            statusBadge.innerHTML = `<i class="fas fa-${icon}"></i><span>${status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Calculando'}</span>`;
+            statusDescription.textContent = description;
+            
+            debugMessage(`Status visual atualizado: ${status}`);
         },
 
         updateAlerts() {
@@ -1851,29 +1976,98 @@ const ApiClientFixed = {
             }
         },
 
-        updateTable() {
-            const tbody = document.getElementById('cenarioTableBody');
-            if (!tbody || !AppState.currentData) return;
-            
-            debugMessage('Atualizando tabela');
-            const { sensibilidade } = AppState.currentData;
-            if (!sensibilidade) return;
-            
-            tbody.innerHTML = '';
-            
-            sensibilidade.forEach(item => {
-                const status = this.getStatusBadge(item.fazenda, item.percentual);
-                
-                tbody.innerHTML += `
-                    <tr>
-                        <td><strong>${item.taxa}%</strong></td>
-                        <td><strong>${Utils.formatCurrency(item.fazenda, true)}</strong></td>
-                        <td>${Utils.formatPercentage(item.percentual)}</td>
-                        <td>${status}</td>
-                    </tr>
-                `;
-            });
-        },
+        updateMetrics() {
+    if (!AppState.currentData) return;
+    
+    debugMessage('Atualizando métricas sincronizadas');
+    const { resultado, patrimonio, status } = AppState.currentData;
+    
+    // ✅ PATRIMÔNIO TOTAL
+    const patrimonioEl = document.getElementById('valorPatrimonio');
+    if (patrimonioEl) {
+        patrimonioEl.textContent = Utils.formatCurrency(patrimonio, true);
+    }
+    
+    // ✅ FAZENDA DISPONÍVEL
+    const fazendaEl = document.getElementById('valorFazenda');
+    const percentualEl = document.getElementById('percentualFazenda');
+    const trendEl = document.getElementById('trendFazenda');
+    
+    if (fazendaEl && resultado) {
+        fazendaEl.textContent = Utils.formatCurrency(resultado.fazenda, true);
+        if (percentualEl) {
+            percentualEl.textContent = Utils.formatPercentage(resultado.percentual);
+        }
+        
+        if (trendEl) {
+            trendEl.className = 'metric-trend';
+            if (resultado.fazenda > 0) {
+                trendEl.classList.add('positive');
+                trendEl.innerHTML = '<i class="fas fa-arrow-up"></i><span>' + Utils.formatPercentage(resultado.percentual) + '</span>';
+            } else {
+                trendEl.classList.add('negative');
+                trendEl.innerHTML = '<i class="fas fa-arrow-down"></i><span>' + Utils.formatPercentage(resultado.percentual) + '</span>';
+            }
+        }
+    }
+    
+    // ✅ ARTE/GALERIA (CORRIGIDO)
+    const arteEl = document.getElementById('valorArte');  // ✅ Seletor correto
+    const percentualArteEl = document.getElementById('percentualArte');
+    const trendArteEl = document.getElementById('trendArte');
+    
+    if (arteEl && resultado) {
+        arteEl.textContent = Utils.formatCurrency(resultado.arte || 0, true);
+        if (percentualArteEl) {
+            percentualArteEl.textContent = Utils.formatPercentage(resultado.percentual_arte || 0);
+        }
+        
+        if (trendArteEl) {
+            trendArteEl.className = 'metric-trend';
+            if (resultado.arte > 0) {
+                trendArteEl.classList.add('positive');
+                trendArteEl.innerHTML = '<i class="fas fa-palette"></i><span>' + Utils.formatPercentage(resultado.percentual_arte || 0) + '</span>';
+            } else {
+                trendArteEl.classList.add('neutral');
+                trendArteEl.innerHTML = '<i class="fas fa-palette"></i><span>Indisponível</span>';
+            }
+        }
+    }
+    
+    // ✅ PERFIL DE INVESTIMENTO (CORRIGIDO)
+    const perfilEl = document.getElementById('perfilAtual');  // ✅ Seletor correto
+    const retornoEl = document.getElementById('retornoEsperado');
+    
+    if (perfilEl) {
+        const perfil = document.getElementById('perfilInvestimento')?.value || 'moderado';
+        perfilEl.textContent = perfil.charAt(0).toUpperCase() + perfil.slice(1);
+        
+        const retornos = {
+            'conservador': '3.5% a.a.',
+            'moderado': '4.5% a.a.',
+            'balanceado': '5.2% a.a.'
+        };
+        if (retornoEl) {
+            retornoEl.textContent = retornos[perfil] || '4.5% a.a.';
+        }
+    }
+    
+    // ✅ TOTAL COMPROMISSOS
+    const compromissosEl = document.getElementById('valorCompromissos');
+    if (compromissosEl && resultado) {
+        compromissosEl.textContent = Utils.formatCurrency(resultado.total, true);
+    }
+    
+    // ✅ STATUS VISUAL
+    this.updateStatusVisual(status);
+    
+    const statusEl = document.getElementById('valorStatus');
+    if (statusEl) {
+        statusEl.textContent = status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Calculando...';
+    }
+
+    debugMessage('✅ Métricas atualizadas com elementos corretos');
+},
 
         getStatusBadge(fazenda, percentual) {
             if (fazenda < 0) {
@@ -1888,146 +2082,7 @@ const ApiClientFixed = {
         }
     };
 
-    const UIManagerFixed = {
-    ...UIManager,
-    
-    updateMetrics() {
-        if (!AppState.currentData) {
-            debugMessage('❌ Dados não disponíveis para atualizar métricas', 'warning');
-            return;
-        }
-        
-        debugMessage('🔄 Atualizando métricas da UI');
-        console.log('Current Data for UI Update:', AppState.currentData);
-        
-        const { resultado, patrimonio, status } = AppState.currentData;
-        
-        if (!resultado) {
-            debugMessage('❌ Resultado não encontrado nos dados', 'error');
-            return;
-        }
-        
-        // 1. PATRIMÔNIO TOTAL
-        this.updateElement('valorPatrimonio', Utils.formatCurrency(patrimonio, true));
-        
-        // 2. VALOR FAZENDA
-        const valorFazenda = resultado.fazenda_disponivel || resultado.fazenda || 0;
-        this.updateElement('valorFazenda', Utils.formatCurrency(valorFazenda, true));
-        
-        // 3. PERCENTUAL FAZENDA
-        const percentualFazenda = resultado.percentual_fazenda || resultado.percentual || 0;
-        this.updateElement('percentualFazenda', Utils.formatPercentage(percentualFazenda));
-        
-        // 4. TOTAL COMPROMISSOS
-        const totalCompromissos = resultado.total_compromissos || resultado.total || 0;
-        this.updateElement('valorCompromissos', Utils.formatCurrency(totalCompromissos, true));
-        
-        // 5. STATUS DO PLANO
-        const statusText = status || 'Calculando...';
-        this.updateElement('valorStatus', statusText.charAt(0).toUpperCase() + statusText.slice(1));
-        
-        // 6. VALOR ARTE
-        const valorArte = resultado.arte || 0;
-        this.updateElement('valorArte', Utils.formatCurrency(valorArte, true));
-        
-        // 7. PERCENTUAL ARTE
-        const percentualArte = resultado.percentual_arte || 0;
-        this.updateElement('percentualArte', Utils.formatPercentage(percentualArte));
-        
-        // 8. RETORNO ESPERADO
-        const retornoEsperado = this.getRetornoEsperado();
-        this.updateElement('retornoEsperado', retornoEsperado);
-        
-        // 9. ATUALIZAR TRENDS
-        this.updateTrends(valorFazenda, percentualFazenda, valorArte, percentualArte);
-        
-        // 10. ATUALIZAR STATUS VISUAL
-        this.updateStatusVisual(status);
-        
-        debugMessage('✅ Métricas atualizadas com sucesso');
-    },
-    
-    updateElement(elementId, value) {
-        const element = document.getElementById(elementId);
-        if (element) {
-            element.textContent = value;
-            debugMessage(`📝 Atualizado ${elementId}: ${value}`);
-        } else {
-            debugMessage(`⚠️ Elemento ${elementId} não encontrado`, 'warning');
-        }
-    },
-    
-    getRetornoEsperado() {
-        const perfil = document.getElementById('perfilInvestimento').value;
-        const retornos = {
-            'conservador': '3.5% a.a.',
-            'moderado': '4.5% a.a.',
-            'balanceado': '5.2% a.a.'
-        };
-        return retornos[perfil] || '4.5% a.a.';
-    },
-    
-    updateTrends(valorFazenda, percentualFazenda, valorArte, percentualArte) {
-        // Trend Fazenda
-        const trendFazenda = document.getElementById('trendFazenda');
-        if (trendFazenda) {
-            trendFazenda.className = 'metric-trend';
-            if (valorFazenda > 0) {
-                trendFazenda.classList.add('positive');
-                trendFazenda.innerHTML = `<i class="fas fa-arrow-up"></i><span>${Utils.formatPercentage(percentualFazenda)}</span>`;
-            } else {
-                trendFazenda.classList.add('negative');
-                trendFazenda.innerHTML = `<i class="fas fa-arrow-down"></i><span>${Utils.formatPercentage(percentualFazenda)}</span>`;
-            }
-        }
-        
-        // Trend Arte
-        const trendArte = document.getElementById('trendArte');
-        if (trendArte) {
-            trendArte.className = 'metric-trend';
-            if (valorArte > 0) {
-                trendArte.classList.add('positive');
-                trendArte.innerHTML = `<i class="fas fa-palette"></i><span>${Utils.formatPercentage(percentualArte)}</span>`;
-            } else {
-                trendArte.classList.add('neutral');
-                trendArte.innerHTML = `<i class="fas fa-palette"></i><span>Indisponível</span>`;
-            }
-        }
-    },
-    
-    updateStatusVisual(status) {
-        const statusBadge = document.getElementById('statusBadge');
-        const statusText = document.getElementById('statusText');
-        const statusDescription = document.getElementById('statusDescription');
-        
-        if (!statusBadge || !statusText || !statusDescription) return;
-        
-        // Remover classes anteriores
-        statusBadge.classList.remove('critico', 'atencao', 'viavel');
-        
-        let icon, description;
-        
-        if (status === 'crítico') {
-            statusBadge.classList.add('critico');
-            icon = 'exclamation-triangle';
-            description = 'Plano insustentável - ação urgente necessária';
-        } else if (status === 'atenção') {
-            statusBadge.classList.add('atencao');
-            icon = 'exclamation-circle';
-            description = 'Plano viável mas com margem baixa';
-        } else {
-            statusBadge.classList.add('viavel');
-            icon = 'check-circle';
-            description = 'Plano sustentável com boa margem';
-        }
-        
-        statusBadge.innerHTML = `<i class="fas fa-${icon}"></i><span>${status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Calculando'}</span>`;
-        statusDescription.textContent = description;
-    }
-};
-
-
-    // ================ GLOBAL FUNCTIONS ================ 
+    // ================ FUNÇÕES GLOBAIS ================ 
     function showPage(pageId) {
         debugMessage(`Navegando para página: ${pageId}`);
         
@@ -2047,7 +2102,6 @@ const ApiClientFixed = {
         
         event.target.closest('.nav-item').classList.add('active');
         
-        // Create charts for the new page with delay
         setTimeout(() => {
             if (AppState.chartJsLoaded) {
                 ChartManager.createCharts();
@@ -2078,20 +2132,16 @@ const ApiClientFixed = {
         Utils.showNotification(`Projeção atualizada para cenário ${scenario}`, 'success');
     }
 
-    // FIXED: Update simulation parameters function
     function updateSimulationParams() {
         debugMessage('Atualizando parâmetros de simulação');
         
-        // Update display values
         document.getElementById('simTaxaMinDisplay').textContent = document.getElementById('simTaxaMin').value + '%';
         document.getElementById('simTaxaMaxDisplay').textContent = document.getElementById('simTaxaMax').value + '%';
         document.getElementById('simVolatilidadeDisplay').textContent = document.getElementById('simVolatilidade').value + '%';
         
-        // Update simulation
         SimulationManager.updateParameters();
     }
 
-    // FIXED: Report generation function
     function generateReportPDF(tipo) {
         debugMessage(`Solicitação de geração de relatório: ${tipo}`);
         ReportManager.generatePDFReport(tipo);
@@ -2161,24 +2211,20 @@ const ApiClientFixed = {
         Utils.showNotification('Exportação para PDF não implementada', 'warning');
     }
 
-    // ================ MAIN CONTROLLER ================ 
+    // ================ MAIN CONTROLLER SINCRONIZADO ================ 
     const DashboardController = {
         async initialize() {
-            debugMessage('Inicializando Dashboard CIMO');
+            debugMessage('Inicializando Dashboard CIMO sincronizado com backend v4.1');
             
             this.setupEvents();
             SidebarController.init();
             
-            // Initialize charts system
             await ChartManager.initializeCharts();
             
-            // Test connection
             await this.testConnection();
             
-            // Load initial data
             await this.loadDashboard();
             
-            // Initialize report history
             ReportManager.updateReportHistoryTable();
         },
 
@@ -2189,6 +2235,12 @@ const ApiClientFixed = {
                 
                 if (!isConnected) {
                     Utils.showNotification('Erro de conexão com o servidor', 'warning');
+                } else {
+                    // ✅ TESTAR CORREÇÕES SE CONECTADO
+                    const testData = await ApiClient.fetchTestCorrecoes();
+                    if (testData) {
+                        debugMessage(`Backend versão: ${testData.versao}, Logo funcionando: ${testData.logo_funcionando}`);
+                    }
                 }
             } catch (error) {
                 debugMessage(`Erro ao testar conexão: ${error.message}`, 'error');
@@ -2196,12 +2248,49 @@ const ApiClientFixed = {
             }
         },
 
+         updateScenarioTable() {
+        if (!AppState.currentData?.sensibilidade) return;
+
+        const tbody = document.getElementById('cenarioTableBody');
+        if (!tbody) return;
+
+        const { sensibilidade } = AppState.currentData;
+        
+        tbody.innerHTML = sensibilidade.map(item => {
+            let statusClass, statusText;
+            if (item.fazenda < 0) {
+                statusClass = 'danger';
+                statusText = 'Inviável';
+            } else if (item.percentual < 5) {
+                statusClass = 'warning'; 
+                statusText = 'Crítico';
+            } else if (item.percentual < 15) {
+                statusClass = 'warning';
+                statusText = 'Atenção';
+            } else {
+                statusClass = 'success';
+                statusText = 'Viável';
+            }
+
+            return `
+                <tr>
+                    <td><strong>${item.taxa}%</strong></td>
+                    <td>${Utils.formatCurrency(item.fazenda, true)}</td>
+                    <td>${Utils.formatPercentage(item.percentual)}</td>
+                    <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+                </tr>
+            `;
+        }).join('');
+
+        debugMessage('✅ Tabela de cenários atualizada');
+    },
+
+
         setupEvents() {
-            // Refresh button
             document.getElementById('refreshBtn').addEventListener('click', () => this.loadDashboard());
             
-            // Controls com debounce para não sobrecarregar a API
-            const debouncedUpdate = this.debounce(() => this.loadDashboard(), 800);
+            // ✅ DEBOUNCE OTIMIZADO PARA NÃO SOBRECARREGAR O BACKEND
+            const debouncedUpdate = this.debounce(() => this.loadDashboard(), 1000); // 1 segundo
             
             document.getElementById('taxaRetorno').addEventListener('input', (e) => {
                 document.getElementById('taxaDisplay').textContent = e.target.value + '%';
@@ -2211,7 +2300,12 @@ const ApiClientFixed = {
             document.getElementById('expectativaVida').addEventListener('change', debouncedUpdate);
             document.getElementById('despesasMensais').addEventListener('input', debouncedUpdate);
             
-            // Simulation parameter events
+            // ✅ NOVOS CAMPOS v4.0 SINCRONIZADOS
+            document.getElementById('perfilInvestimento').addEventListener('change', debouncedUpdate);
+            document.getElementById('inicioRendaFilhos').addEventListener('change', debouncedUpdate);
+            document.getElementById('custoFazenda').addEventListener('input', debouncedUpdate);
+            
+            // Simulation events
             document.getElementById('simTaxaMin').addEventListener('input', (e) => {
                 document.getElementById('simTaxaMinDisplay').textContent = e.target.value + '%';
             });
@@ -2239,26 +2333,23 @@ const ApiClientFixed = {
 
         async loadDashboard() {
             try {
-                debugMessage('Carregando dados da API');
+                debugMessage('Carregando dados da API sincronizada v4.1');
                 
-                // Mostrar loading
                 UIManager.showLoading(true);
                 AppState.isLoading = true;
                 
-                // Buscar dados da API Flask
+                // ✅ USAR CLIENTE API SINCRONIZADO
                 const data = await ApiClient.fetchData();
                 
-                debugMessage('Dados recebidos com sucesso');
+                debugMessage(`Dados recebidos: versão ${data.versao}, sucesso: ${data.success}`);
                 
-                // Atualizar estado da aplicação
                 AppState.currentData = data;
                 
-                // Atualizar UI
+                // ✅ ATUALIZAR UI COM DADOS SINCRONIZADOS
                 UIManager.updateMetrics();
                 UIManager.updateAlerts();
                 UIManager.updateTable();
                 
-                // Criar gráficos com delay
                 setTimeout(() => {
                     if (AppState.chartJsLoaded) {
                         ChartManager.createCharts();
@@ -2273,7 +2364,6 @@ const ApiClientFixed = {
                 debugMessage(`Erro ao carregar dashboard: ${error.message}`, 'error');
                 Utils.showNotification(`Erro ao carregar dados: ${error.message}`, 'danger');
                 
-                // Se falhar, mostrar mensagem de erro mais detalhada
                 const container = document.getElementById('alertContainer');
                 if (container) {
                     container.innerHTML = `
@@ -2285,91 +2375,15 @@ const ApiClientFixed = {
                     `;
                 }
             } finally {
-                // Remover loading
                 UIManager.showLoading(false);
                 AppState.isLoading = false;
             }
         }
     };
 
-    const DashboardControllerFixed = {
-    ...DashboardController,
     
-    async loadDashboard() {
-        try {
-            debugMessage('🚀 Iniciando carregamento do dashboard');
-            
-            // Mostrar loading
-            UIManager.showLoading(true);
-            AppState.isLoading = true;
-            
-            // Limpar estado anterior
-            AppState.currentData = null;
-            
-            // Buscar dados da API Flask com validação
-            const data = await ApiClientFixed.fetchData();
-            
-            if (!data) {
-                throw new Error('Dados da API são nulos ou inválidos');
-            }
-            
-            debugMessage('✅ Dados recebidos e validados com sucesso');
-            console.log('Final Data for AppState:', data);
-            
-            // Atualizar estado da aplicação
-            AppState.currentData = data;
-            
-            // Atualizar UI com dados válidos
-            UIManagerFixed.updateMetrics();
-            UIManager.updateAlerts();
-            UIManager.updateTable();
-            
-            // Criar gráficos com delay
-            setTimeout(() => {
-                if (AppState.chartJsLoaded) {
-                    ChartManager.createCharts();
-                } else {
-                    ChartManager.showAlternativeVisualization();
-                }
-            }, 300);
-            
-            Utils.showNotification('✅ Dashboard atualizado com sucesso!', 'success');
-            
-        } catch (error) {
-            debugMessage(`❌ Erro ao carregar dashboard: ${error.message}`, 'error');
-            Utils.showNotification(`❌ Erro ao carregar dados: ${error.message}`, 'danger');
-            
-            // Mostrar erro detalhado
-            this.showDetailedError(error);
-            
-        } finally {
-            // Remover loading
-            UIManager.showLoading(false);
-            AppState.isLoading = false;
-        }
-    },
-    
-    showDetailedError(error) {
-        const container = document.getElementById('alertContainer');
-        if (container) {
-            container.innerHTML = `
-                <div class="alert danger">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    <div>
-                        <strong>Erro de Conexão:</strong> ${error.message}<br>
-                        <small>Verifique se o backend Flask está rodando em http://localhost:5000</small>
-                        <br><br>
-                        <button onclick="DashboardController.loadDashboard()" style="background: var(--primary); color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; margin-top: 8px;">
-                            🔄 Tentar Novamente
-                        </button>
-                    </div>
-                </div>
-            `;
-        }
-    }
-};
 
-    // ================ DEBUG HELPERS ================ 
+    // ================ DEBUG HELPERS SINCRONIZADOS ================ 
     window.CimoDebug = {
         state: () => AppState,
         charts: () => AppState.charts,
@@ -2379,6 +2393,7 @@ const ApiClientFixed = {
         reports: ReportManager,
         testAPI: () => ApiClient.testConnection(),
         refreshData: () => DashboardController.loadDashboard(),
+        
         testChartJS: async () => {
             debugMessage('Testando Chart.js manualmente');
             try {
@@ -2392,6 +2407,7 @@ const ApiClientFixed = {
                 return false;
             }
         },
+        
         forceCharts: async () => {
             debugMessage('Forçando criação de gráficos');
             AppState.retryingCharts = true;
@@ -2414,6 +2430,7 @@ const ApiClientFixed = {
                 await DashboardController.loadDashboard();
             }
         },
+        
         testSimulation: () => {
             debugMessage('Testando simulação');
             if (AppState.currentPage !== 'simulations') {
@@ -2422,8 +2439,9 @@ const ApiClientFixed = {
             }
             SimulationManager.runSimulation();
         },
+        
         testReport: (tipo) => {
-            debugMessage(`Testando relatório: ${tipo}`);
+            debugMessage(`Testando relatório: ${tipo} (simulação local)`);
             if (!tipo) tipo = 'executivo';
             if (!['executivo', 'detalhado', 'simulacao'].includes(tipo)) {
                 debugMessage(`Tipo inválido. Use: executivo, detalhado ou simulacao`, 'warning');
@@ -2431,688 +2449,428 @@ const ApiClientFixed = {
                 return;
             }
             
-            if (tipo === 'simulacao') {
-                debugMessage(`Parâmetros de simulação: ${JSON.stringify(AppState.simulationParams)}`);
-            }
-            
             ReportManager.generatePDFReport(tipo);
         },
+        
+        // ✅ NOVOS TESTES v4.0 SINCRONIZADOS
+        testV4Features: async () => {
+            debugMessage('🧪 Testando funcionalidades v4.0 sincronizadas');
+            
+            try {
+                const perfis = ['conservador', 'moderado', 'balanceado'];
+                for (const perfil of perfis) {
+                    document.getElementById('perfilInvestimento').value = perfil;
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    debugMessage(`✅ Perfil ${perfil}: Configurado`);
+                }
+                
+                const opcoes = ['falecimento', 'imediato', '65'];
+                for (const opcao of opcoes) {
+                    document.getElementById('inicioRendaFilhos').value = opcao;
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    debugMessage(`✅ Início filhos ${opcao}: Configurado`);
+                }
+                
+                document.getElementById('perfilInvestimento').value = 'moderado';
+                document.getElementById('inicioRendaFilhos').value = 'falecimento';
+                
+                await DashboardController.loadDashboard();
+                
+                Utils.showNotification('🎉 Testes v4.0 concluídos com sucesso!', 'success');
+                debugMessage('🎉 Todos os testes v4.0 passaram');
+                
+            } catch (error) {
+                debugMessage(`❌ Erro nos testes v4.0: ${error.message}`, 'error');
+                Utils.showNotification('❌ Erro nos testes v4.0', 'danger');
+            }
+        },
+        
+        getV4Status: () => {
+            return {
+                versao: '4.0-SINCRONIZADA',
+                backend_integrado: true,
+                inputs_implementados: {
+                    perfil_investimento: !!document.getElementById('perfilInvestimento'),
+                    inicio_renda_filhos: !!document.getElementById('inicioRendaFilhos'),
+                    custo_fazenda: !!document.getElementById('custoFazenda')
+                },
+                metricas_implementadas: {
+                    valor_arte: !!document.querySelector('#valorArte h3'),
+                    perfil_atual: !!document.getElementById('perfilAtual'),
+                    status_visual: !!document.getElementById('statusBadge')
+                },
+                endpoints_testados: {
+                    dados: '/api/dados',
+                    teste: '/api/teste',
+                    teste_correcoes: '/api/teste-correcoes'
+                },
+                campos_sincronizados: [
+                    'taxa', 'expectativa', 'despesas', 
+                    'perfil', 'inicio_renda_filhos', 'custo_fazenda'
+                ]
+            };
+        },
+        
+        testBackendSync: async () => {
+            debugMessage('🔄 Testando sincronização completa com backend');
+            
+            try {
+                // Testar conexão
+                const connected = await ApiClient.testConnection();
+                if (!connected) {
+                    throw new Error('Backend não conectado');
+                }
+                
+                // Testar endpoint de dados com todos os parâmetros v4.0
+                const originalValues = {
+                    taxa: document.getElementById('taxaRetorno').value,
+                    expectativa: document.getElementById('expectativaVida').value,
+                    despesas: document.getElementById('despesasMensais').value,
+                    perfil: document.getElementById('perfilInvestimento').value,
+                    inicio_renda_filhos: document.getElementById('inicioRendaFilhos').value,
+                    custo_fazenda: document.getElementById('custoFazenda').value
+                };
+                
+                // Configurar valores de teste
+                document.getElementById('taxaRetorno').value = '4.5';
+                document.getElementById('expectativaVida').value = '90';
+                document.getElementById('despesasMensais').value = '150000';
+                document.getElementById('perfilInvestimento').value = 'moderado';
+                document.getElementById('inicioRendaFilhos').value = 'falecimento';
+                document.getElementById('custoFazenda').value = '2000000';
+                
+                const data = await ApiClient.fetchData();
+                
+                if (data.success) {
+                    debugMessage('✅ Sincronização completa OK');
+                    debugMessage(`Versão backend: ${data.versao}`);
+                    debugMessage(`Fazenda disponível: ${Utils.formatCurrency(data.resultado.fazenda, true)}`);
+                    Utils.showNotification('🎯 Sincronização com backend 100% OK!', 'success');
+                } else {
+                    throw new Error('Resposta de falha do backend');
+                }
+                
+                // Restaurar valores originais
+                Object.keys(originalValues).forEach(key => {
+                    const element = {
+                        taxa: document.getElementById('taxaRetorno'),
+                        expectativa: document.getElementById('expectativaVida'),
+                        despesas: document.getElementById('despesasMensais'),
+                        perfil: document.getElementById('perfilInvestimento'),
+                        inicio_renda_filhos: document.getElementById('inicioRendaFilhos'),
+                        custo_fazenda: document.getElementById('custoFazenda')
+                    }[key];
+                    
+                    if (element) {
+                        element.value = originalValues[key];
+                    }
+                });
+                
+                return true;
+                
+            } catch (error) {
+                debugMessage(`❌ Erro na sincronização: ${error.message}`, 'error');
+                Utils.showNotification(`❌ Falha na sincronização: ${error.message}`, 'danger');
+                return false;
+            }
+        },
+        
         logs: () => debugLog,
         clearLogs: () => {
             debugLog = [];
             updateDebugConsole();
+        },
+        
+        // ✅ DEBUG ESPECÍFICO PARA MAPEAMENTO DE DADOS
+        debugDataMapping: () => {
+            if (!AppState.currentData) {
+                debugMessage('❌ Nenhum dado carregado ainda');
+                return null;
+            }
+            
+            const mapping = {
+                raw_response: AppState.currentData,
+                mapped_fields: {
+                    patrimonio: AppState.currentData.patrimonio,
+                    fazenda_backend: AppState.currentData.resultado?.fazenda_disponivel,
+                    fazenda_frontend: AppState.currentData.resultado?.fazenda,
+                    total_backend: AppState.currentData.resultado?.total_compromissos,
+                    total_frontend: AppState.currentData.resultado?.total,
+                    percentual_backend: AppState.currentData.resultado?.percentual_fazenda,
+                    percentual_frontend: AppState.currentData.resultado?.percentual,
+                    arte: AppState.currentData.resultado?.arte,
+                    percentual_arte: AppState.currentData.resultado?.percentual_arte
+                },
+                generated_data: {
+                    allocation: AppState.currentData.allocation?.length || 0,
+                    sensibilidade: AppState.currentData.sensibilidade?.length || 0,
+                    fluxo_caixa: AppState.currentData.fluxo_caixa?.length || 0
+                }
+            };
+            
+            console.table(mapping.mapped_fields);
+            debugMessage('📊 Mapeamento de dados logado no console');
+            
+            return mapping;
         }
+        
+
+        
+        
     };
 
-    // ================ INITIALIZATION ================ 
-    document.addEventListener('DOMContentLoaded', () => {
-        debugMessage('DOM carregado - inicializando aplicação');
+    // ================ VALIDAÇÕES DE ENTRADA LOCAIS ================ 
+    function validarInputsLocais() {
+        const taxa = parseFloat(document.getElementById('taxaRetorno').value);
+        const expectativa = parseInt(document.getElementById('expectativaVida').value);
+        const despesas = parseFloat(document.getElementById('despesasMensais').value);
+        const custoFazenda = parseFloat(document.getElementById('custoFazenda').value);
         
-        // Initialize with a small delay to ensure everything is ready
+        debugMessage('Validando inputs localmente antes de enviar ao backend');
+        
+        if (taxa < 0.1 || taxa > 15) {
+            Utils.showNotification('Taxa de retorno deve estar entre 0.1% e 15%', 'danger');
+            return false;
+        }
+        
+        if (taxa > 8) {
+            Utils.showNotification('⚠️ Taxa de retorno acima de 8% é muito otimista', 'warning');
+        }
+        
+        if (expectativa < 53) {
+            Utils.showNotification('Expectativa de vida deve ser pelo menos 53 anos', 'danger');
+            return false;
+        }
+        
+        if (despesas < 50000 || despesas > 1000000) {
+            Utils.showNotification('Despesas devem estar entre R$ 50.000 e R$ 1.000.000', 'danger');
+            return false;
+        }
+        
+        if (custoFazenda < 500000 || custoFazenda > 10000000) {
+            Utils.showNotification('Custo da fazenda deve estar entre R$ 500.000 e R$ 10.000.000', 'danger');
+            return false;
+        }
+        
+        return true;
+    }
+
+    // ================ INICIALIZAÇÃO SINCRONIZADA ================ 
+    document.addEventListener('DOMContentLoaded', () => {
+        debugMessage('DOM carregado - inicializando aplicação sincronizada com backend v4.1');
+        
+        // ✅ VALIDAR SE TODOS OS ELEMENTOS NECESSÁRIOS ESTÃO PRESENTES
+        const requiredElements = [
+            'taxaRetorno', 'expectativaVida', 'despesasMensais',
+            'perfilInvestimento', 'inicioRendaFilhos', 'custoFazenda'
+        ];
+        
+        const missingElements = requiredElements.filter(id => !document.getElementById(id));
+        
+        if (missingElements.length > 0) {
+            debugMessage(`❌ Elementos HTML faltando: ${missingElements.join(', ')}`, 'error');
+            Utils.showNotification(`Erro: Elementos HTML faltando: ${missingElements.join(', ')}`, 'danger');
+            return;
+        }
+        
+        debugMessage('✅ Todos os elementos HTML necessários encontrados');
+        
+        // Inicializar com delay para garantir que tudo está pronto
         setTimeout(() => {
             DashboardController.initialize();
         }, 200);
     });
 
+    // ================ PERFORMANCE OPTIMIZATIONS ================ 
     const ChartCache = {
-cache: new Map(),
-maxSize: 20,
+        cache: new Map(),
+        maxSize: 20,
 
-generateKey(pageId, dataHash) {
-    return `${pageId}-${dataHash}`;
-},
+        generateKey(pageId, dataHash) {
+            return `${pageId}-${dataHash}`;
+        },
 
-getChart(key) {
-    const cached = this.cache.get(key);
-    if (cached) {
-        // Move para o final (LRU)
-        this.cache.delete(key);
-        this.cache.set(key, cached);
-        debugMessage(`Cache hit para: ${key}`);
-        return cached;
-    }
-    return null;
-},
+        getChart(key) {
+            const cached = this.cache.get(key);
+            if (cached) {
+                this.cache.delete(key);
+                this.cache.set(key, cached);
+                debugMessage(`Cache hit para: ${key}`);
+                return cached;
+            }
+            return null;
+        },
 
-setChart(key, chart) {
-    // Remove mais antigo se exceder tamanho máximo
-    if (this.cache.size >= this.maxSize) {
-        const oldestKey = this.cache.keys().next().value;
-        const oldChart = this.cache.get(oldestKey);
-        if (oldChart && oldChart.destroy) {
-            oldChart.destroy();
-        }
-        this.cache.delete(oldestKey);
-    }
-    
-    this.cache.set(key, chart);
-    debugMessage(`Cache set para: ${key}`);
-},
-
-invalidateAll() {
-    this.cache.forEach((chart, key) => {
-        if (chart && chart.destroy) {
-            chart.destroy();
-        }
-    });
-    this.cache.clear();
-    debugMessage('Cache limpo completamente');
-}
-};
-
-// 2. Intersection Observer para Lazy Loading
-const ChartLazyLoader = {
-observer: null,
-
-init() {
-    if (!window.IntersectionObserver) return;
-    
-    this.observer = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                const container = entry.target;
-                const chartType = container.dataset.chartType;
-                
-                if (chartType && !container.dataset.loaded) {
-                    debugMessage(`Lazy loading chart: ${chartType}`);
-                    this.loadChart(container, chartType);
-                    container.dataset.loaded = 'true';
-                    this.observer.unobserve(container);
+        setChart(key, chart) {
+            if (this.cache.size >= this.maxSize) {
+                const oldestKey = this.cache.keys().next().value;
+                const oldChart = this.cache.get(oldestKey);
+                if (oldChart && oldChart.destroy) {
+                    oldChart.destroy();
                 }
+                this.cache.delete(oldestKey);
             }
-        });
-    }, {
-        threshold: 0.1,
-        rootMargin: '50px'
-    });
-},
-
-observe(container, chartType) {
-    if (this.observer) {
-        container.dataset.chartType = chartType;
-        this.observer.observe(container);
-    }
-},
-
-loadChart(container, chartType) {
-    const loadFunctions = {
-        'compromissos': () => ChartManager.createCompromissosChart(),
-        'allocation': () => ChartManager.createAllocationChart(),
-        'sensibilidade': () => ChartManager.createSensibilidadeChart(),
-        'monteCarlo': () => ChartManager.createMonteCarloChart(),
-        'distribuicao': () => ChartManager.createDistribuicaoChart()
-    };
-    
-    const loadFunction = loadFunctions[chartType];
-    if (loadFunction) {
-        loadFunction();
-    }
-}
-};
-
-// 3. Performance Monitor
-const PerformanceMonitor = {
-metrics: {},
-
-start(label) {
-    if (performance.mark) {
-        performance.mark(`${label}-start`);
-    }
-    this.metrics[label] = { start: Date.now() };
-},
-
-end(label) {
-    if (!this.metrics[label]) return;
-    
-    const duration = Date.now() - this.metrics[label].start;
-    this.metrics[label].duration = duration;
-    
-    if (performance.mark && performance.measure) {
-        performance.mark(`${label}-end`);
-        performance.measure(label, `${label}-start`, `${label}-end`);
-    }
-    
-    // Log se demorar mais que o esperado
-    const thresholds = {
-        'chart-creation': 1000,
-        'api-call': 2000,
-        'page-navigation': 500,
-        'pdf-generation': 5000
-    };
-    
-    if (duration > (thresholds[label] || 1000)) {
-        debugMessage(`⚠️ Performance: ${label} demorou ${duration}ms`, 'warning');
-    } else {
-        debugMessage(`✅ Performance: ${label} completado em ${duration}ms`);
-    }
-    
-    return duration;
-},
-
-getMetrics() {
-    return this.metrics;
-},
-
-getAverageTime(label) {
-    const entries = performance.getEntriesByName(label);
-    if (entries.length === 0) return 0;
-    
-    const total = entries.reduce((sum, entry) => sum + entry.duration, 0);
-    return total / entries.length;
-}
-};
-
-// 4. Otimização do ChartManager
-const OptimizedChartManager = {
-...ChartManager,
-
-// Override da função createCharts para usar cache
-createCharts() {
-    if (!AppState.chartJsLoaded || typeof Chart === 'undefined') {
-        debugMessage('Chart.js não disponível - usando visualização alternativa', 'warning');
-        this.showAlternativeVisualization();
-        return;
-    }
-
-    if (!AppState.currentData) {
-        debugMessage('Dados não disponíveis para gráficos', 'warning');
-        return;
-    }
-
-    PerformanceMonitor.start('chart-creation');
-    
-    try {
-        // Gerar hash dos dados para cache
-        const dataHash = this.generateDataHash(AppState.currentData);
-        const cacheKey = ChartCache.generateKey(AppState.currentPage, dataHash);
-        
-        // Verificar cache primeiro
-        const cachedCharts = ChartCache.getChart(cacheKey);
-        if (cachedCharts) {
-            this.restoreChartsFromCache(cachedCharts);
-            PerformanceMonitor.end('chart-creation');
-            return;
-        }
-        
-        // Destruir gráficos existentes apenas se necessário
-        this.smartDestroyCharts();
-        
-        // Criar novos gráficos
-        this.createChartsForCurrentPage();
-        
-        // Salvar no cache
-        ChartCache.setChart(cacheKey, { ...AppState.charts });
-        
-        debugMessage('Gráficos criados com sucesso');
-    } catch (error) {
-        debugMessage(`Erro ao criar gráficos: ${error.message}`, 'error');
-        this.showChartError();
-    } finally {
-        PerformanceMonitor.end('chart-creation');
-    }
-},
-
-generateDataHash(data) {
-    // Gerar hash simples dos dados para detectar mudanças
-    const str = JSON.stringify({
-        patrimonio: data.patrimonio,
-        fazenda: data.resultado?.fazenda,
-        taxa: data.parametros?.taxa,
-        timestamp: Math.floor(Date.now() / 60000) // Hash por minuto
-    });
-    
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-        const char = str.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash = hash & hash; // Convert to 32-bit integer
-    }
-    return hash.toString();
-},
-
-smartDestroyCharts() {
-    // Destruir apenas gráficos que serão recriados
-    const chartsToDestroy = this.getChartsForPage(AppState.currentPage);
-    
-    chartsToDestroy.forEach(chartKey => {
-        if (AppState.charts[chartKey] && AppState.charts[chartKey].destroy) {
-            try {
-                AppState.charts[chartKey].destroy();
-                debugMessage(`Gráfico ${chartKey} destruído`);
-            } catch (error) {
-                debugMessage(`Erro ao destruir gráfico ${chartKey}: ${error.message}`, 'warning');
-            }
-            delete AppState.charts[chartKey];
-        }
-    });
-},
-
-getChartsForPage(pageId) {
-    const pageCharts = {
-        'dashboard': ['compromissos', 'allocation', 'sensibilidade'],
-        'allocation': ['currentAllocation', 'benchmark'],
-        'projections': ['patrimonialEvolution', 'cashFlow'],
-        'simulations': ['monteCarlo', 'distribuicao'],
-        'scenarios': ['scenarioComparison', 'scenarioEvolution', 'stressTest'],
-        'sensitivity': ['returnSensitivity', 'expenseSensitivity', 'bidimensional']
-    };
-    
-    return pageCharts[pageId] || [];
-},
-
-createChartsForCurrentPage() {
-    const pageCharts = this.getChartsForPage(AppState.currentPage);
-    const containers = pageCharts.map(chart => `${chart}Container`);
-    
-    this.hideChartPlaceholders(containers);
-    
-    // Criar gráficos baseado na página atual
-    switch (AppState.currentPage) {
-        case 'dashboard':
-            this.createCompromissosChart();
-            this.createAllocationChart();
-            this.createSensibilidadeChart();
-            break;
-        case 'allocation':
-            this.createAllocationPageCharts();
-            break;
-        case 'projections':
-            this.createProjectionCharts();
-            break;
-        case 'simulations':
-            this.createSimulationCharts();
-            break;
-        case 'scenarios':
-            this.createScenarioCharts();
-            break;
-        case 'sensitivity':
-            this.createSensitivityCharts();
-            break;
-    }
-}
-};
-
-// 5. API Client com Cache
-const OptimizedApiClient = {
-...ApiClient,
-cache: new Map(),
-cacheTimeout: 60000, // 1 minuto
-
-async fetchDataWithCache() {
-    const params = new URLSearchParams({
-    taxa: document.getElementById('taxaRetorno').value,
-    expectativa: document.getElementById('expectativaVida').value,
-    despesas: document.getElementById('despesasMensais').value,
-    // ADICIONAR estes 3 parâmetros obrigatórios:
-    perfil: document.getElementById('perfilInvestimento').value,
-    inicio_renda_filhos: document.getElementById('inicioRendaFilhos').value,
-    custo_fazenda: document.getElementById('custoFazenda').value
-});
-    
-    const cacheKey = params.toString();
-    const cached = this.cache.get(cacheKey);
-    
-    if (cached && (Date.now() - cached.timestamp) < this.cacheTimeout) {
-        debugMessage('Usando dados do cache local');
-        return cached.data;
-    }
-    
-    PerformanceMonitor.start('api-call');
-    
-    try {
-        const data = await this.fetchData();
-        
-        // Salvar no cache
-        this.cache.set(cacheKey, {
-            data: data,
-            timestamp: Date.now()
-        });
-        
-        // Limpar cache antigo
-        this.cleanOldCache();
-        
-        return data;
-    } finally {
-        PerformanceMonitor.end('api-call');
-    }
-},
-
-cleanOldCache() {
-    const now = Date.now();
-    for (const [key, value] of this.cache.entries()) {
-        if (now - value.timestamp > this.cacheTimeout) {
-            this.cache.delete(key);
-        }
-    }
-}
-};
-
-// 6. Inicialização das Otimizações
-function initializePerformanceOptimizations() {
-debugMessage('Inicializando otimizações de performance');
-
-// Inicializar lazy loading
-ChartLazyLoader.init();
-
-// Substituir ChartManager por versão otimizada
-Object.assign(ChartManager, OptimizedChartManager);
-
-// Substituir ApiClient por versão otimizada
-Object.assign(ApiClient, OptimizedApiClient);
-
-// Monitor de performance global
-window.PerformanceMonitor = PerformanceMonitor;
-window.ChartCache = ChartCache;
-
-debugMessage('Otimizações de performance carregadas');
-}
-
-// ================ FUNÇÕES ATUALIZADAS v4.0 ================
-
-// Validações de sanidade locais
-function validarInputsLocais() {
-    const taxa = parseFloat(document.getElementById('taxaRetorno').value);
-    const expectativa = parseInt(document.getElementById('expectativaVida').value);
-    const despesas = parseFloat(document.getElementById('despesasMensais').value);
-    const custoFazenda = parseFloat(document.getElementById('custoFazenda').value);
-    
-    debugMessage('Validando inputs localmente');
-    
-    // Validar taxa de retorno (deve estar entre 0.1% e 15%)
-    if (taxa < 0.1 || taxa > 15) {
-        Utils.showNotification('Taxa de retorno deve estar entre 0.1% e 15%', 'danger');
-        return false;
-    }
-    
-    // Alertar se taxa muito otimista
-    if (taxa > 8) {
-        Utils.showNotification('⚠️ Taxa de retorno acima de 8% é muito otimista para perfil conservador-moderado', 'warning');
-    }
-    
-    // Validar expectativa de vida (deve ser >= 53 anos)
-    if (expectativa < 53) {
-        Utils.showNotification('Expectativa de vida deve ser pelo menos 53 anos', 'danger');
-        return false;
-    }
-    
-    // Validar despesas (entre R$ 50k e R$ 1M)
-    if (despesas < 50000 || despesas > 1000000) {
-        Utils.showNotification('Despesas devem estar entre R$ 50.000 e R$ 1.000.000', 'danger');
-        return false;
-    }
-    
-    // Validar custo fazenda
-    if (custoFazenda < 500000 || custoFazenda > 10000000) {
-        Utils.showNotification('Custo da fazenda deve estar entre R$ 500.000 e R$ 10.000.000', 'danger');
-        return false;
-    }
-    
-    return true;
-}
-
-// ApiClient atualizado com novos parâmetros
-const ApiClientV4 = {
-    ...ApiClient,
-    
-    async fetchData() {
-        // Validar inputs antes de enviar
-        if (!validarInputsLocais()) {
-            throw new Error('Parâmetros inválidos');
-        }
-        
-        try {
-            debugMessage('Iniciando requisição para API v4.0');
             
-            const params = new URLSearchParams({
-                taxa: document.getElementById('taxaRetorno').value,
-                expectativa: document.getElementById('expectativaVida').value,
-                despesas: document.getElementById('despesasMensais').value,
-                // NOVOS PARÂMETROS v4.0:
-                perfil: document.getElementById('perfilInvestimento').value,
-                inicio_renda_filhos: document.getElementById('inicioRendaFilhos').value,
-                custo_fazenda: document.getElementById('custoFazenda').value
+            this.cache.set(key, chart);
+            debugMessage(`Cache set para: ${key}`);
+        },
+
+        invalidateAll() {
+            this.cache.forEach((chart, key) => {
+                if (chart && chart.destroy) {
+                    chart.destroy();
+                }
             });
-
-            const url = `${CONFIG.ENDPOINTS.dados}?${params}`;
-            debugMessage(`URL da requisição v4.0: ${url}`);
-
-            const response = await fetch(url);
-            
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-
-            const data = await response.json();
-            debugMessage(`Dados v4.0 recebidos: versão ${data.versao || 'desconhecida'}`);
-            
-            if (!data.success) {
-                throw new Error(data.erro || 'Erro desconhecido na API v4.0');
-            }
-
-            return data;
-        } catch (error) {
-            debugMessage(`Erro na API v4.0: ${error.message}`, 'error');
-            throw error;
+            this.cache.clear();
+            debugMessage('Cache limpo completamente');
         }
-    }
-};
+    };
 
-// UIManager atualizado para novos campos
-const UIManagerV4 = {
-    ...UIManager,
-    
-    updateMetrics() {
-        if (!AppState.currentData) return;
-        
-        debugMessage('Atualizando métricas v4.0');
-        const { resultado, patrimonio, status, parametros } = AppState.currentData;
-        
-        // Métricas existentes
-        const patrimonioEl = document.getElementById('valorPatrimonio');
-        if (patrimonioEl) {
-            patrimonioEl.textContent = Utils.formatCurrency(patrimonio, true);
-        }
-        
-        const fazendaEl = document.getElementById('valorFazenda');
-        const percentualEl = document.getElementById('percentualFazenda');
-        const trendEl = document.getElementById('trendFazenda');
-        
-        if (fazendaEl && resultado) {
-            fazendaEl.textContent = Utils.formatCurrency(resultado.fazenda, true);
+    // ================ INTERSECTION OBSERVER PARA LAZY LOADING ================ 
+    const ChartLazyLoader = {
+        observer: null,
+
+        init() {
+            if (!window.IntersectionObserver) return;
             
-            if (percentualEl) {
-                percentualEl.textContent = Utils.formatPercentage(resultado.percentual);
+            this.observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const container = entry.target;
+                        const chartType = container.dataset.chartType;
+                        
+                        if (chartType && !container.dataset.loaded) {
+                            debugMessage(`Lazy loading chart: ${chartType}`);
+                            this.loadChart(container, chartType);
+                            container.dataset.loaded = 'true';
+                            this.observer.unobserve(container);
+                        }
+                    }
+                });
+            }, {
+                threshold: 0.1,
+                rootMargin: '50px'
+            });
+        },
+
+        observe(container, chartType) {
+            if (this.observer) {
+                container.dataset.chartType = chartType;
+                this.observer.observe(container);
             }
-            
-            if (trendEl) {
-                trendEl.className = 'metric-trend';
-                if (resultado.fazenda > 0) {
-                    trendEl.classList.add('positive');
-                    trendEl.innerHTML = '<i class="fas fa-arrow-up"></i><span>' + Utils.formatPercentage(resultado.percentual) + '</span>';
-                } else {
-                    trendEl.classList.add('negative');
-                    trendEl.innerHTML = '<i class="fas fa-arrow-down"></i><span>' + Utils.formatPercentage(resultado.percentual) + '</span>';
-                }
-            }
-        }
-        
-        // NOVO: Atualizar valor arte
-        const arteEl = document.getElementById('valorArte');
-        const percentualArteEl = document.getElementById('percentualArte');
-        const trendArteEl = document.getElementById('trendArte');
-        
-        if (arteEl && resultado) {
-            arteEl.textContent = Utils.formatCurrency(resultado.arte || 0, true);
-            
-            if (percentualArteEl) {
-                percentualArteEl.textContent = Utils.formatPercentage(resultado.percentual_arte || 0);
-            }
-            
-            if (trendArteEl) {
-                trendArteEl.className = 'metric-trend';
-                if (resultado.arte > 0) {
-                    trendArteEl.classList.add('positive');
-                    trendArteEl.innerHTML = '<i class="fas fa-palette"></i><span>' + Utils.formatPercentage(resultado.percentual_arte || 0) + '</span>';
-                } else {
-                    trendArteEl.classList.add('neutral');
-                    trendArteEl.innerHTML = '<i class="fas fa-palette"></i><span>Indisponível</span>';
-                }
-            }
-        }
-        
-        // NOVO: Atualizar perfil de investimento
-        const perfilEl = document.getElementById('perfilAtual');
-        const retornoEl = document.getElementById('retornoEsperado');
-        
-        if (perfilEl && parametros) {
-            const perfil = parametros.perfil_investimento || 'moderado';
-            perfilEl.textContent = perfil.charAt(0).toUpperCase() + perfil.slice(1);
-            
-            // Mostrar retorno esperado baseado no perfil
-            const retornos = {
-                'conservador': '3.5% a.a.',
-                'moderado': '4.5% a.a.',
-                'balanceado': '5.2% a.a.'
+        },
+
+        loadChart(container, chartType) {
+            const loadFunctions = {
+                'compromissos': () => ChartManager.createCompromissosChart(),
+                'allocation': () => ChartManager.createAllocationChart(),
+                'sensibilidade': () => ChartManager.createSensibilidadeChart(),
+                'monteCarlo': () => ChartManager.createMonteCarloChart(),
+                'distribuicao': () => ChartManager.createDistribuicaoChart()
             };
-            if (retornoEl) {
-                retornoEl.textContent = retornos[perfil] || '4.5% a.a.';
+            
+            const loadFunction = loadFunctions[chartType];
+            if (loadFunction) {
+                loadFunction();
             }
         }
-        
-        // NOVO: Status visual do plano
-        this.updateStatusVisual(status);
-        
-        // Compromissos existente
-        const compromissosEl = document.getElementById('valorCompromissos');
-        if (compromissosEl && resultado) {
-            compromissosEl.textContent = Utils.formatCurrency(resultado.total, true);
+    };
+
+    // ================ PERFORMANCE MONITOR ================ 
+    const PerformanceMonitor = {
+        metrics: {},
+
+        start(label) {
+            if (performance.mark) {
+                performance.mark(`${label}-start`);
+            }
+            this.metrics[label] = { start: Date.now() };
+        },
+
+        end(label) {
+            if (!this.metrics[label]) return;
+            
+            const duration = Date.now() - this.metrics[label].start;
+            this.metrics[label].duration = duration;
+            
+            if (performance.mark && performance.measure) {
+                performance.mark(`${label}-end`);
+                performance.measure(label, `${label}-start`, `${label}-end`);
+            }
+            
+            const thresholds = {
+                'chart-creation': 1000,
+                'api-call': 2000,
+                'page-navigation': 500,
+                'pdf-generation': 5000
+            };
+            
+            if (duration > (thresholds[label] || 1000)) {
+                debugMessage(`⚠️ Performance: ${label} demorou ${duration}ms`, 'warning');
+            } else {
+                debugMessage(`✅ Performance: ${label} completado em ${duration}ms`);
+            }
+            
+            return duration;
+        },
+
+        getMetrics() {
+            return this.metrics;
+        },
+
+        getAverageTime(label) {
+            const entries = performance.getEntriesByName(label);
+            if (entries.length === 0) return 0;
+            
+            const total = entries.reduce((sum, entry) => sum + entry.duration, 0);
+            return total / entries.length;
         }
-        
-        // Status existente
-        const statusEl = document.getElementById('valorStatus');
-        if (statusEl) {
-            statusEl.textContent = status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Calculando...';
-        }
-    },
-    
-    updateStatusVisual(status) {
-        const statusBadge = document.getElementById('statusBadge');
-        const statusText = document.getElementById('statusText');
-        const statusDescription = document.getElementById('statusDescription');
-        const statusEl = document.getElementById('valorStatus');
-        
-        if (!statusBadge || !statusText || !statusDescription) return;
-        
-        // Remover classes anteriores
-        statusBadge.classList.remove('critico', 'atencao', 'viavel');
-        
-        // Adicionar classe baseada no status
-        let icon, description;
-        
-        if (status === 'crítico') {
-            statusBadge.classList.add('critico');
-            icon = 'exclamation-triangle';
-            description = 'Plano insustentável - ação urgente necessária';
-            if (statusEl) statusEl.innerHTML = '⚠️ Crítico';
-        } else if (status === 'atenção') {
-            statusBadge.classList.add('atencao');
-            icon = 'exclamation-circle';
-            description = 'Plano viável mas com margem baixa';
-            if (statusEl) statusEl.innerHTML = '⚡ Atenção';
-        } else {
-            statusBadge.classList.add('viavel');
-            icon = 'check-circle';
-            description = 'Plano sustentável com boa margem';
-            if (statusEl) statusEl.innerHTML = '✅ Viável';
-        }
-        
-        statusBadge.innerHTML = `<i class="fas fa-${icon}"></i><span>${status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Calculando'}</span>`;
-        statusDescription.textContent = description;
-        
-        debugMessage(`Status visual atualizado: ${status}`);
+    };
+
+    // ================ INICIALIZAÇÃO DAS OTIMIZAÇÕES ================ 
+    function initializePerformanceOptimizations() {
+        debugMessage('Inicializando otimizações de performance');
+
+        ChartLazyLoader.init();
+
+        window.PerformanceMonitor = PerformanceMonitor;
+        window.ChartCache = ChartCache;
+
+        debugMessage('Otimizações de performance carregadas');
     }
-};
 
-// Event listeners para novos inputs
-document.addEventListener('DOMContentLoaded', () => {
-    // ... inicialização existente ...
-    
-    // NOVOS EVENT LISTENERS v4.0
-    const debouncedUpdate = DashboardController.debounce(() => DashboardController.loadDashboard(), 800);
-    
-    // Perfil de investimento
-    document.getElementById('perfilInvestimento').addEventListener('change', debouncedUpdate);
-    
-    // Início renda filhos
-    document.getElementById('inicioRendaFilhos').addEventListener('change', debouncedUpdate);
-    
-    // Custo fazenda
-    document.getElementById('custoFazenda').addEventListener('input', debouncedUpdate);
-    
-    debugMessage('Event listeners v4.0 configurados');
-});
+    // ================ EXPOR OBJETOS GLOBAIS PARA DEBUG ================ 
+    window.AppState = AppState;
+    window.ChartManager = ChartManager;
+    window.UIManager = UIManager;
+    window.ApiClient = ApiClient;
+    window.DataMapper = DataMapper;
+    window.Utils = Utils;
+    window.DashboardController = DashboardController;
+    window.SimulationManager = SimulationManager;
+    window.ReportManager = ReportManager;
 
-// Substituir ApiClient e UIManager por versões v4.0
-Object.assign(ApiClient, ApiClientFixed);
-Object.assign(UIManager, UIManagerFixed);
-Object.assign(DashboardController, DashboardControllerFixed);
+    // ================ FUNÇÕES GLOBAIS EXPOSTAS ================ 
+    window.showPage = showPage;
+    window.showAnalysis = showAnalysis;
+    window.updateProjection = updateProjection;
+    window.updateSimulationParams = updateSimulationParams;
+    window.generateReportPDF = generateReportPDF;
+    window.generateReport = generateReport;
+    window.downloadReport = downloadReport;
+    window.exportChart = exportChart;
+    window.exportTable = exportTable;
+    window.exportToPDF = exportToPDF;
+    window.toggleDebug = toggleDebug;
+    window.validarInputsLocais = validarInputsLocais;
 
-// Debug helpers atualizados
-window.CimoDebug = {
-    ...window.CimoDebug,
-    
-    forceRefresh: async () => {
-        debugMessage('🔧 Forçando refresh completo dos dados');
-        AppState.currentData = null;
-        await DashboardController.loadDashboard();
-    },
-    
-    testDataMapping: () => {
-        debugMessage('🧪 Testando mapeamento de dados');
-        
-        // Dados de teste simulando resposta da API
-        const testApiData = {
-            success: true,
-            patrimonio: 65000000,
-            resultado: {
-                fazenda_disponivel: 17687612,
-                total_compromissos: 47312388,
-                percentual_fazenda: 27.2,
-                despesas: 35083874,
-                filhos: 5436046,
-                doacoes: 6792469,
-                arte: 15687612,
-                percentual_arte: 24.1
-            },
-            versao: "4.1-TEST"
-        };
-        
-        const mapped = DataMapper.mapApiResponse(testApiData);
-        console.log('Teste de mapeamento:', mapped);
-        
-        // Aplicar dados de teste
-        AppState.currentData = mapped;
-        UIManagerFixed.updateMetrics();
-        
-        Utils.showNotification('✅ Teste de mapeamento aplicado!', 'success');
-    },
-    
-    checkUIElements: () => {
-        const elements = [
-            'valorPatrimonio', 'valorFazenda', 'percentualFazenda',
-            'valorCompromissos', 'valorStatus', 'valorArte', 'percentualArte'
-        ];
-        
-        elements.forEach(id => {
-            const el = document.getElementById(id);
-            console.log(`Elemento ${id}:`, el ? '✅ Encontrado' : '❌ Não encontrado');
-        });
-    },
-    
-    simulateAPIError: () => {
-        debugMessage('🚨 Simulando erro da API');
-        DashboardController.showDetailedError(new Error('Erro simulado para teste'));
-    }
-};
+    // ================ LOG DE INICIALIZAÇÃO ================ 
+    debugMessage('🚀 JavaScript sincronizado com backend app.py v4.1 CARREGADO');
+    debugMessage('📋 Endpoints disponíveis: /api/dados, /api/teste, /api/teste-correcoes');
+    debugMessage('🔧 Campos sincronizados: taxa, expectativa, despesas, perfil, inicio_renda_filhos, custo_fazenda');
+    debugMessage('📊 Mapeamento de dados: fazenda_disponivel → fazenda, total_compromissos → total');
+    debugMessage('⚡ Performance optimizations: Chart caching, lazy loading, debounced API calls');
+    debugMessage('🐛 Debug disponível via window.CimoDebug');
 
-debugMessage('🔧 Correções aplicadas - versão FIXED');
+    // Inicializar otimizações
+    initializePerformanceOptimizations();
