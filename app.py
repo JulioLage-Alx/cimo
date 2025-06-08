@@ -725,11 +725,33 @@ def gerar_projecao_fluxo_com_fazenda(taxa, expectativa, despesas, anos, inicio_r
         if ano < PERIODO_DOACOES:
             saidas_anuais += DOACOES * 12
             
-        # Renda dos filhos
-        if idade_ana >= idade_inicio_filhos and idade_ana > expectativa:
+        # 🔧 RENDA DOS FILHOS CORRIGIDA
+        renda_filhos_ativa = False
+        periodo_renda = None
+        
+        if inicio_renda_filhos == 'falecimento':
+            # Só após morte de Ana
+            if idade_ana > expectativa:
+                saidas_anuais += RENDA_FILHOS * 12
+                renda_filhos_ativa = True
+                periodo_renda = 'heranca'
+        elif inicio_renda_filhos == 'imediato':
+            # Durante toda vida dos filhos
             saidas_anuais += RENDA_FILHOS * 12
+            renda_filhos_ativa = True
+            periodo_renda = 'imediato'
+        else:
+            # CORREÇÃO: Dois períodos
+            if idade_ana >= idade_inicio_filhos:
+                saidas_anuais += RENDA_FILHOS * 12
+                renda_filhos_ativa = True
+                
+                if ana_viva:
+                    periodo_renda = 'periodo1_vida_ana'
+                else:
+                    periodo_renda = 'periodo2_heranca'
 
-        # COMPRA DA FAZENDA (novo)
+        # COMPRA DA FAZENDA
         compra_fazenda = False
         valor_gasto_fazenda = 0
         if periodo_compra_fazenda and ano + 1 == periodo_compra_fazenda:
@@ -749,6 +771,15 @@ def gerar_projecao_fluxo_com_fazenda(taxa, expectativa, despesas, anos, inicio_r
         patrimonio_atual += saldo_liquido
         patrimonio_atual = max(patrimonio_atual, 0)
         
+        # Marco especial
+        marco_especial = None
+        if idade_ana == expectativa + 1 and ano > 0:
+            marco_especial = f"🕊️ Falecimento de Ana"
+        elif idade_ana == idade_inicio_filhos and inicio_renda_filhos not in ['falecimento', 'imediato']:
+            marco_especial = f"👨‍👩‍👧‍👦 Início renda filhos (PERÍODO 1)"
+        elif idade_ana == expectativa + 1 and periodo_renda == 'periodo2_heranca':
+            marco_especial = f"👨‍👩‍👧‍👦 Renda filhos vira herança (PERÍODO 2)"
+        
         fluxo.append({
             'ano': ano_calendario,
             'idade_ana': idade_ana,
@@ -757,23 +788,26 @@ def gerar_projecao_fluxo_com_fazenda(taxa, expectativa, despesas, anos, inicio_r
             'saidas': saidas_anuais,
             'saldo_liquido': saldo_liquido,
             'ana_viva': ana_viva,
-            'renda_filhos_ativa': idade_ana >= idade_inicio_filhos and idade_ana > expectativa,
+            'renda_filhos_ativa': renda_filhos_ativa,
+            'periodo_renda': periodo_renda,  # 🔧 NOVO: Indica qual período
             'doacoes_ativas': ano < PERIODO_DOACOES,
             
-            # NOVOS CAMPOS PARA FAZENDA
+            # Campos da fazenda
             'compra_fazenda': compra_fazenda,
             'valor_gasto_fazenda': valor_gasto_fazenda,
             'liquidez_necessaria_pct': liquidez_info['liquidez_pct'],
             'liquidez_fase': liquidez_info['fase'],
             'liquidez_descricao': liquidez_info.get('descricao', ''),
             
-            # DESPESAS DETALHADAS
+            # Despesas detalhadas
             'despesas_ana': despesas * 12 if ana_viva else 0,
             'doacoes': DOACOES * 12 if ano < PERIODO_DOACOES else 0,
-            'renda_filhos': RENDA_FILHOS * 12 if idade_ana >= idade_inicio_filhos and idade_ana > expectativa else 0
+            'renda_filhos': RENDA_FILHOS * 12 if renda_filhos_ativa else 0,
+            'marco_especial': marco_especial
         })
     
     return fluxo
+
 
 def calcular_patrimonio_disponivel_periodo(periodo_compra, valor_fazenda_atual, taxa, expectativa, despesas, inicio_renda_filhos, perfil_investimento):
     """
@@ -1159,6 +1193,62 @@ def validar_capacidade_dual(patrimonio, rendimento_anual, despesas_ana, renda_fi
         'viavel': True,
         'margem_seguranca': rendimento_anual - saida_anual_total
     }
+    
+    
+def calcular_renda_vitalicia_corrigida_v44(inicio_renda_filhos, expectativa_ana, taxa):
+    """
+    🔧 VERSÃO 4.4 - CORREÇÃO CRÍTICA: Renda filhos em dois períodos
+    
+    PROBLEMA IDENTIFICADO:
+    - Quando início = "aos 65 anos", sistema calculava apenas período pós-morte
+    - Ignorava completamente o período entre 65 anos e expectativa de vida
+    
+    SOLUÇÃO IMPLEMENTADA:
+    - PERÍODO 1: Durante vida de Ana (65 → expectativa Ana)
+    - PERÍODO 2: Após morte de Ana (herança vitalícia → expectativa filhos)
+    
+    Returns:
+        tuple: (anos_ate_inicio, vp_total)
+    """
+    
+    print(f"\n🔧 RENDA FILHOS v4.4: início={inicio_renda_filhos}, expectativa_ana={expectativa_ana}")
+    
+    if inicio_renda_filhos == 'falecimento':
+        # ✅ MODELO ORIGINAL (CORRETO) - Só após morte
+        anos_ate_inicio = expectativa_ana - IDADE_ANA
+        idade_filhos_ao_inicio = IDADE_ESTIMADA_FILHOS + anos_ate_inicio
+        anos_duracao = max(0, EXPECTATIVA_FILHOS - idade_filhos_ao_inicio)
+        
+        print(f"   📊 Falecimento: {anos_duracao} anos de renda")
+        return anos_ate_inicio, anos_duracao
+        
+    elif inicio_renda_filhos == 'imediato':
+        # ✅ MODELO IMEDIATO (CORRETO)
+        anos_ate_inicio = 0
+        anos_duracao = EXPECTATIVA_FILHOS - IDADE_ESTIMADA_FILHOS  # ~55 anos
+        
+        print(f"   📊 Imediato: {anos_duracao} anos de renda")
+        return anos_ate_inicio, anos_duracao
+        
+    else:
+        # 🔧 CORREÇÃO PRINCIPAL: Idade específica (ex: 65)
+        idade_inicio = int(inicio_renda_filhos)
+        anos_ate_inicio = max(0, idade_inicio - IDADE_ANA)
+        
+        if idade_inicio < expectativa_ana:
+            # ✅ INICIA DURANTE VIDA DE ANA - USAR MODELO COMPLETO
+            anos_durante_vida = expectativa_ana - idade_inicio
+            anos_total = anos_durante_vida + max(0, EXPECTATIVA_FILHOS - (IDADE_ESTIMADA_FILHOS + (expectativa_ana - IDADE_ANA)))
+            
+            print(f"   🎯 Dois períodos: {anos_durante_vida} anos (vida) + herança = {anos_total} anos total")
+            return anos_ate_inicio, anos_total
+        else:
+            # Início após expectativa = igual falecimento
+            anos_duracao = max(0, EXPECTATIVA_FILHOS - (IDADE_ESTIMADA_FILHOS + anos_ate_inicio))
+            print(f"   📊 Após expectativa: {anos_duracao} anos")
+            return anos_ate_inicio, anos_duracao
+
+
 def calcular_compromissos_v42_corrigido(taxa, expectativa, despesas, inicio_renda_filhos, custo_fazenda=2_000_000, perfil_investimento='moderado'):
     """
     VERSÃO 4.2 - TODOS OS ERROS CORRIGIDOS:
@@ -1170,67 +1260,99 @@ def calcular_compromissos_v42_corrigido(taxa, expectativa, despesas, inicio_rend
     ✅ #6: Inflação já descontada na taxa real
     ✅ #7: Otimização temporal implementada
     """
+    print(f"💰 CALCULANDO COMPROMISSOS v4.4 - RENDA FILHOS CORRIGIDA")
     
-    # 1. VALIDAR INPUTS (mantido - estava correto)
+    # 1. Validar inputs
     validar_inputs(taxa, expectativa, despesas, inicio_renda_filhos)
     
-    # 2. CORREÇÃO #1: USAR PATRIMÔNIO INTEGRAL  
+    # 2. Patrimônio integral
     patrimonio_disponivel = obter_patrimonio_disponivel(perfil_investimento)
     
-    # 3. CORREÇÃO #4: OTIMIZAR TIMING DOS COMPROMISSOS
-    timing_analysis, inicio_otimizado = otimizar_timing_compromissos(taxa, expectativa, inicio_renda_filhos)
-    
-    # 4. CALCULAR ANOS DE VIDA DE ANA (mantido)
+    # 3. Calcular anos de vida de Ana
     anos_vida_ana = expectativa - IDADE_ANA
     
-    # 5. VP DESPESAS DE ANA (mantido - obrigatoriamente imediatas)
+    # 4. VP Despesas de Ana
     vp_despesas = valor_presente(despesas, anos_vida_ana, taxa)
     
-    # 6. CORREÇÃO #3: VP RENDA VITALÍCIA CORRIGIDA DOS FILHOS
-    anos_ate_inicio, anos_duracao = calcular_renda_vitalicia_corrigida(inicio_otimizado, expectativa)
-    
-    if anos_duracao > 0:
-        if anos_ate_inicio > 0:
+    # 5. 🔧 VP RENDA FILHOS CORRIGIDO
+    if inicio_renda_filhos == 'falecimento':
+        # Modelo original
+        anos_ate_inicio, anos_duracao = calcular_renda_vitalicia_corrigida_v44(inicio_renda_filhos, expectativa, taxa)
+        
+        if anos_duracao > 0:
             fator_desconto = (1 + taxa/100) ** (-anos_ate_inicio)
             vp_filhos = valor_presente(RENDA_FILHOS, anos_duracao, taxa) * fator_desconto
         else:
-            vp_filhos = valor_presente(RENDA_FILHOS, anos_duracao, taxa)
+            vp_filhos = 0
+            
+    elif inicio_renda_filhos == 'imediato':
+        # Modelo imediato
+        anos_ate_inicio, anos_duracao = calcular_renda_vitalicia_corrigida_v44(inicio_renda_filhos, expectativa, taxa)
+        vp_filhos = valor_presente(RENDA_FILHOS, anos_duracao, taxa)
+        
     else:
-        vp_filhos = 0
-        print("⚠️  AVISO: Duração da renda dos filhos = 0 anos")
+        # 🔧 MODELO CORRIGIDO: Dois períodos para idade específica
+        idade_inicio = int(inicio_renda_filhos)
+        anos_ate_inicio = max(0, idade_inicio - IDADE_ANA)
+        
+        if idade_inicio < expectativa:
+            # PERÍODO 1: Durante vida de Ana
+            anos_periodo1 = expectativa - idade_inicio
+            vp_periodo1 = valor_presente(RENDA_FILHOS, anos_periodo1, taxa)
+            
+            if anos_ate_inicio > 0:
+                vp_periodo1 *= (1 + taxa/100) ** (-anos_ate_inicio)
+            
+            # PERÍODO 2: Após morte de Ana
+            idade_filhos_quando_ana_morre = IDADE_ESTIMADA_FILHOS + (expectativa - IDADE_ANA)
+            anos_periodo2 = max(0, EXPECTATIVA_FILHOS - idade_filhos_quando_ana_morre)
+            
+            if anos_periodo2 > 0:
+                vp_periodo2 = valor_presente(RENDA_FILHOS, anos_periodo2, taxa)
+                vp_periodo2 *= (1 + taxa/100) ** (-(expectativa - IDADE_ANA))
+            else:
+                vp_periodo2 = 0
+            
+            vp_filhos = vp_periodo1 + vp_periodo2
+            
+            print(f"   🎯 DOIS PERÍODOS:")
+            print(f"      Período 1 (vida): {anos_periodo1} anos, VP = R$ {vp_periodo1:,.0f}")
+            print(f"      Período 2 (herança): {anos_periodo2} anos, VP = R$ {vp_periodo2:,.0f}")
+            print(f"      TOTAL: R$ {vp_filhos:,.0f}")
+        else:
+            # Igual ao modelo falecimento
+            anos_duracao = max(0, EXPECTATIVA_FILHOS - (IDADE_ESTIMADA_FILHOS + anos_ate_inicio))
+            if anos_duracao > 0:
+                fator_desconto = (1 + taxa/100) ** (-anos_ate_inicio)
+                vp_filhos = valor_presente(RENDA_FILHOS, anos_duracao, taxa) * fator_desconto
+            else:
+                vp_filhos = 0
     
-    # 7. VP DOAÇÕES (mantido - 15 anos exatos)
+    # 6. VP Doações
     vp_doacoes = valor_presente(DOACOES, PERIODO_DOACOES, taxa)
     
-    # 8. CORREÇÃO #2: ITCMD APENAS INFORMATIVO
-    patrimonio_estimado_heranca = patrimonio_disponivel  # Estimativa simples
-    itcmd_info = estimar_itcmd_futuro(patrimonio_estimado_heranca)
-    
-    # 9. TOTAL DE COMPROMISSOS (SEM ITCMD)
+    # 7. Total compromissos
     total_compromissos = vp_despesas + vp_filhos + vp_doacoes
-    # CORREÇÃO: ITCMD não entra no cálculo atual
     
-    # 10. VALOR DISPONÍVEL PARA FAZENDA
+    # 8. Valor disponível para fazenda
     valor_disponivel_fazenda = patrimonio_disponivel - total_compromissos
     percentual_fazenda = (valor_disponivel_fazenda / PATRIMONIO) * 100
     
-    # 11. CORREÇÃO #5: AVALIAR FAZENDA SEM LIMITES ARBITRÁRIOS
+    # 9. Avaliação fazenda
     avaliacao_fazenda = avaliar_sustentabilidade_fazenda(custo_fazenda, patrimonio_disponivel, valor_disponivel_fazenda)
     
-    # 12. VALOR PARA ARTE/GALERIA
+    # 10. Valor para arte/galeria
     valor_arte = max(0, valor_disponivel_fazenda - custo_fazenda) if valor_disponivel_fazenda > 0 else 0
     percentual_arte = (valor_arte / PATRIMONIO) * 100 if valor_arte > 0 else 0
     
-    # 13. LOGS INFORMATIVOS
-    print(f"\n💰 COMPROMISSOS CORRIGIDOS v4.2:")
-    print(f"   • VP Despesas Ana ({anos_vida_ana} anos): {format_currency(vp_despesas)}")
-    print(f"   • VP Renda Vitalícia Filhos ({anos_duracao} anos): {format_currency(vp_filhos)}")
-    print(f"   • VP Doações (15 anos): {format_currency(vp_doacoes)}")
+    # 11. Log final
+    print(f"\n💰 RESULTADO v4.4 CORRIGIDO:")
+    print(f"   • VP Despesas Ana: {format_currency(vp_despesas)}")
+    print(f"   • VP Renda Filhos CORRIGIDO: {format_currency(vp_filhos)}")
+    print(f"   • VP Doações: {format_currency(vp_doacoes)}")
     print(f"   • Total Compromissos: {format_currency(total_compromissos)}")
-    print(f"\n🏡 ANÁLISE FAZENDA:")
-    print(f"   • Disponível para fazenda: {format_currency(valor_disponivel_fazenda)} ({percentual_fazenda:.1f}%)")
-    print(f"   • Status: {avaliacao_fazenda['status']} - {avaliacao_fazenda['recomendacao']}")
-    print(f"🎨 Valor arte/galeria: {format_currency(valor_arte)} ({percentual_arte:.1f}%)")
+    print(f"   • Fazenda disponível: {format_currency(valor_disponivel_fazenda)} ({percentual_fazenda:.1f}%)")
+    print(f"   • Arte disponível: {format_currency(valor_arte)} ({percentual_arte:.1f}%)")
     
     return {
         'patrimonio_total': PATRIMONIO,
@@ -1244,15 +1366,11 @@ def calcular_compromissos_v42_corrigido(taxa, expectativa, despesas, inicio_rend
         'arte': valor_arte,
         'percentual_arte': percentual_arte,
         'custo_fazenda': custo_fazenda,
-        'itcmd_informativo': itcmd_info,
         'avaliacao_fazenda': avaliacao_fazenda,
-        'timing_analysis': timing_analysis,
-        'anos_vida_ana': anos_vida_ana,
-        'anos_renda_filhos': anos_duracao,
-        'inicio_renda_filhos': inicio_otimizado,
-        'perfil_investimento': perfil_investimento,
-        'corrected_version': '4.2-ALL-ERRORS-FIXED'
+        'corrected_version': '4.4-RENDA-FILHOS-DOIS-PERIODOS'
     }
+
+
 
 
 def stress_test_longevidade(taxa, despesas, inicio_renda_filhos):
@@ -2492,7 +2610,7 @@ def dashboard():
 def api_dados_v43():
     """API principal - VERSÃO v4.3 COM FAZENDA"""
     try:
-        # Parâmetros básicos
+        # Parâmetros
         taxa = float(request.args.get('taxa', 4.0))
         expectativa = int(request.args.get('expectativa', 90))
         despesas = float(request.args.get('despesas', 150000))
@@ -2500,7 +2618,6 @@ def api_dados_v43():
         custo_fazenda = float(request.args.get('custo_fazenda', 2_000_000))
         perfil_investimento = request.args.get('perfil', 'moderado')
         
-        # NOVO PARÂMETRO: período de compra da fazenda
         periodo_compra_fazenda = request.args.get('periodo_compra_fazenda')
         if periodo_compra_fazenda:
             try:
@@ -2510,13 +2627,13 @@ def api_dados_v43():
             except:
                 periodo_compra_fazenda = None
         
-        print(f"📥 Parâmetros recebidos v4.3 COM FAZENDA:")
-        print(f"   Taxa: {taxa}% (real), Expectativa: {expectativa}, Fazenda: {periodo_compra_fazenda or 'imediato'} anos")
+        print(f"📥 API v4.4 - CORREÇÃO RENDA FILHOS:")
+        print(f"   Taxa: {taxa}%, Início filhos: {inicio_renda_filhos}")
         
-        # USAR FUNÇÃO v4.3 COM FAZENDA
-        resultado = calcular_compromissos_v43_com_fazenda(
+        # USAR FUNÇÃO v4.4 CORRIGIDA
+        resultado = calcular_compromissos_v42_corrigido(
             taxa, expectativa, despesas, inicio_renda_filhos, 
-            custo_fazenda, perfil_investimento, periodo_compra_fazenda
+            custo_fazenda, perfil_investimento
         )
         
         status = determinar_status(resultado['fazenda_disponivel'], resultado['percentual_fazenda'])
@@ -2535,30 +2652,24 @@ def api_dados_v43():
                 'filhos': resultado['filhos'],
                 'doacoes': resultado['doacoes'],
                 'arte': resultado['arte'],
-                'percentual_arte': resultado['percentual_arte'],
-                
-                # NOVOS CAMPOS v4.3
-                'fazenda_analysis': resultado['fazenda_analysis'],
-                'periodo_compra_fazenda': resultado['periodo_compra_fazenda'],
-                'valor_fazenda_atual': resultado['valor_fazenda_atual'],
-                'valor_fazenda_futuro': resultado['valor_fazenda_futuro']
+                'percentual_arte': resultado['percentual_arte']
             },
             'allocation': allocation,
             'status': status,
-            'versao': '4.3-FAZENDA-LIQUIDEZ',
+            'versao': '4.4-RENDA-FILHOS-CORRIGIDA',
             'timestamp': get_current_datetime_sao_paulo().isoformat()
         }
         
-        print(f"✅ v4.3 - Fazenda em {periodo_compra_fazenda or 'imediato'} anos: {format_currency(resultado['fazenda_disponivel'], True)}")
+        print(f"✅ v4.4 CORRIGIDA - Renda filhos: {format_currency(resultado['filhos'], True)}")
         
         return jsonify(response_data)
         
     except Exception as e:
-        print(f"❌ Erro na API dados v4.3: {str(e)}")
+        print(f"❌ Erro na API v4.4: {str(e)}")
         return jsonify({
             'success': False,
             'erro': str(e),
-            'versao': '4.3-FAZENDA-LIQUIDEZ',
+            'versao': '4.4-RENDA-FILHOS-CORRIGIDA',
             'timestamp': get_current_datetime_sao_paulo().isoformat()
         }), 500
 
