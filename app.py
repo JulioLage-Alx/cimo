@@ -30,12 +30,12 @@ DESPESAS_BASE = 150_000  # R$ 150k/mês (padrão de vida de Ana)
 RENDA_FILHOS = 150_000   # R$ 50k x 3 filhos = R$ 150k/mês total
 DOACOES = 50_000         # R$ 50k/mês para fundação "Para Todos em Varginha"
 PERIODO_DOACOES = 15     # Exatamente 15 anos de doações
-
-# CORREÇÃO #1: Taxa de inflação presumida (para referência nos comentários)
+INFLACAO_ESTATICA = 3.5 
+# Taxa de inflação presumida (para referência nos comentários)
 # A taxa de retorno utilizada é sempre REAL (já descontada desta inflação)
 INFLACAO_PRESUMIDA = 3.5  # % ao ano (IPCA histórico Brasil)
 
-# CORREÇÃO #2: Expectativas de vida realistas
+# Expectativas de vida realistas
 EXPECTATIVA_ANA_DEFAULT = 90    # Expectativa base para Ana
 EXPECTATIVA_FILHOS = 85         # Expectativa conservadora dos filhos
 IDADE_ESTIMADA_FILHOS = 30     # Filhos já adultos e formados
@@ -43,8 +43,21 @@ IDADE_ESTIMADA_FILHOS = 30     # Filhos já adultos e formados
 # Timezone para relatórios
 SAO_PAULO_TZ = pytz.timezone('America/Sao_Paulo')
 
+# Fases de liquidez (conservadora: 40%, 40%, 20%)
+FASES_LIQUIDEZ = {
+    'fase1_pct': 0.40,  # 40% do período
+    'fase2_pct': 0.40,  # 40% do período  
+    'fase3_pct': 0.20,  # 20% do período
+    'liquidez_base': 2,      # Liquidez normal do perfil
+    'liquidez_fase2': 4,     # Fase intermediária
+    'liquidez_fase3': 8,     # Fase de aceleração
+    'liquidez_final': 15     # Fase final antes da compra
+}
+
+
+
 # ================ ESTRUTURA DE ASSET ALLOCATION ================
-# Perfis de alocação baseados no perfil conservador-moderado de Ana
+# Perfieados no perfil conservador-moderado de Anas de alocação bas
 ASSET_ALLOCATION_PROFILES = {
     'conservador': {
         'renda_fixa_br': 70,      # 70% Renda Fixa Nacional
@@ -292,7 +305,7 @@ class RelatorioGenerator:
         """Resumo patrimonial seguro"""
         try:
             return {
-                'patrimonio_total': 65000000,  # PATRIMONIO
+                'patrimonio_total': 65000000,  
                 'compromissos': {
                     'despesas_ana': {
                         'valor': self.dados.get('despesas', 0),
@@ -556,7 +569,267 @@ class RelatorioGenerator:
         return {'observacao': 'Simulação Monte Carlo em desenvolvimento'}
 
 
+def calcular_valor_futuro_fazenda(valor_atual, anos):
+    """
+    Calcula valor da fazenda ajustado pela inflação
+    
+    Args:
+        valor_atual (float): Valor atual da fazenda (R$)
+        anos (int): Anos até a compra
+    
+    Returns:
+        float: Valor futuro ajustado pela inflação
+    """
+    if anos <= 0:
+        return valor_atual
+    
+    valor_futuro = valor_atual * ((1 + INFLACAO_ESTATICA/100) ** anos)
+    
+    print(f"💰 Valor fazenda: R$ {valor_atual:,.0f} hoje → R$ {valor_futuro:,.0f} em {anos} anos (inflação {INFLACAO_ESTATICA}%)")
+    
+    return valor_futuro
 
+def calcular_liquidez_por_fase(periodo_compra):
+    """
+    Calcula fases de liquidez conforme período de compra
+    Fases conservadoras: 40%, 40%, 20% do período
+    
+    Args:
+        periodo_compra (int): Anos até compra da fazenda
+    
+    Returns:
+        dict: Fases com anos e percentual de liquidez
+    """
+    if periodo_compra <= 0:
+        return {}
+    
+    fase1_anos = max(1, int(periodo_compra * FASES_LIQUIDEZ['fase1_pct']))
+    fase2_anos = max(1, int(periodo_compra * FASES_LIQUIDEZ['fase2_pct']))
+    fase3_anos = periodo_compra - fase1_anos - fase2_anos
+    
+    # Garantir que fase3 tenha pelo menos 1 ano
+    if fase3_anos <= 0:
+        fase3_anos = 1
+        fase2_anos = periodo_compra - fase1_anos - fase3_anos
+    
+    fases = {
+        'fase1': {
+            'anos_inicio': 1,
+            'anos_fim': fase1_anos,
+            'liquidez_pct': FASES_LIQUIDEZ['liquidez_base'],
+            'descricao': f'Anos 1-{fase1_anos}: Liquidez normal'
+        },
+        'fase2': {
+            'anos_inicio': fase1_anos + 1,
+            'anos_fim': fase1_anos + fase2_anos,
+            'liquidez_pct': FASES_LIQUIDEZ['liquidez_fase2'],
+            'descricao': f'Anos {fase1_anos + 1}-{fase1_anos + fase2_anos}: Acúmulo moderado'
+        },
+        'fase3': {
+            'anos_inicio': fase1_anos + fase2_anos + 1,
+            'anos_fim': periodo_compra,
+            'liquidez_pct': FASES_LIQUIDEZ['liquidez_final'],
+            'descricao': f'Anos {fase1_anos + fase2_anos + 1}-{periodo_compra}: Acúmulo intensivo'
+        },
+        'total_anos': periodo_compra,
+        'valor_fazenda_necessario': 0  # Será calculado depois
+    }
+    
+    print(f"📊 Fases de liquidez para {periodo_compra} anos:")
+    for fase_nome, fase in fases.items():
+        if isinstance(fase, dict) and 'descricao' in fase:
+            print(f"   {fase['descricao']} - {fase['liquidez_pct']}% liquidez")
+    
+    return fases
+
+def calcular_liquidez_necessaria_ano(ano, periodo_compra, valor_fazenda_futuro):
+    """
+    Calcula liquidez necessária em determinado ano
+    
+    Args:
+        ano (int): Ano da projeção (1, 2, 3...)
+        periodo_compra (int): Anos até compra
+        valor_fazenda_futuro (float): Valor da fazenda na data de compra
+    
+    Returns:
+        dict: Liquidez percentual e valor absoluto necessário
+    """
+    if periodo_compra <= 0 or ano > periodo_compra:
+        return {'liquidez_pct': 2, 'valor_absoluto': 0, 'fase': 'normal'}
+    
+    fases = calcular_liquidez_por_fase(periodo_compra)
+    
+    # Determinar em que fase estamos
+    if ano <= fases['fase1']['anos_fim']:
+        liquidez_pct = fases['fase1']['liquidez_pct']
+        fase = 'fase1'
+    elif ano <= fases['fase2']['anos_fim']:
+        liquidez_pct = fases['fase2']['liquidez_pct']
+        fase = 'fase2'
+    else:
+        liquidez_pct = fases['fase3']['liquidez_pct']
+        fase = 'fase3'
+    
+    # No ano da compra, adicionar valor da fazenda
+    valor_fazenda_necessario = valor_fazenda_futuro if ano == periodo_compra else 0
+    
+    return {
+        'liquidez_pct': liquidez_pct,
+        'valor_fazenda_necessario': valor_fazenda_necessario,
+        'fase': fase,
+        'descricao': f'{liquidez_pct}% liquidez' + (f' + R$ {valor_fazenda_necessario:,.0f} fazenda' if valor_fazenda_necessario > 0 else '')
+    }
+
+
+def gerar_projecao_fluxo_com_fazenda(taxa, expectativa, despesas, anos, inicio_renda_filhos, periodo_compra_fazenda=None, valor_fazenda_futuro=0):
+    """
+    Versão estendida da projeção que inclui compra da fazenda
+    
+    Args:
+        Parâmetros existentes + periodo_compra_fazenda e valor_fazenda_futuro
+    
+    Returns:
+        list: Projeção anual incluindo eventos da fazenda
+    """
+    patrimonio_atual = PATRIMONIO
+    fluxo = []
+    
+    # Determinar quando inicia renda dos filhos
+    if inicio_renda_filhos == 'falecimento':
+        idade_inicio_filhos = expectativa
+    elif inicio_renda_filhos == 'imediato':
+        idade_inicio_filhos = IDADE_ANA
+    elif isinstance(inicio_renda_filhos, int):
+        idade_inicio_filhos = int(inicio_renda_filhos)
+    else:
+        idade_inicio_filhos = 65  # default
+
+    for ano in range(anos):
+        idade_ana = IDADE_ANA + ano + 1
+        ano_calendario = 2025 + ano
+        
+        # RENDIMENTOS
+        rendimentos = patrimonio_atual * (taxa / 100)
+        
+        # SAÍDAS ANUAIS
+        saidas_anuais = 0
+        
+        # Despesas de Ana (apenas se viva)
+        if idade_ana <= expectativa:
+            saidas_anuais += despesas * 12
+            ana_viva = True
+        else:
+            ana_viva = False
+        
+        # Doações (primeiros 15 anos)
+        if ano < PERIODO_DOACOES:
+            saidas_anuais += DOACOES * 12
+            
+        # Renda dos filhos
+        if idade_ana >= idade_inicio_filhos and idade_ana > expectativa:
+            saidas_anuais += RENDA_FILHOS * 12
+
+        # COMPRA DA FAZENDA (novo)
+        compra_fazenda = False
+        valor_gasto_fazenda = 0
+        if periodo_compra_fazenda and ano + 1 == periodo_compra_fazenda:
+            compra_fazenda = True
+            valor_gasto_fazenda = valor_fazenda_futuro
+            saidas_anuais += valor_gasto_fazenda
+
+        # LIQUIDEZ NECESSÁRIA
+        liquidez_info = {}
+        if periodo_compra_fazenda and ano + 1 <= periodo_compra_fazenda:
+            liquidez_info = calcular_liquidez_necessaria_ano(ano + 1, periodo_compra_fazenda, valor_fazenda_futuro)
+        else:
+            liquidez_info = {'liquidez_pct': 2, 'valor_fazenda_necessario': 0, 'fase': 'normal'}
+        
+        # SALDO LÍQUIDO
+        saldo_liquido = rendimentos - saidas_anuais
+        patrimonio_atual += saldo_liquido
+        patrimonio_atual = max(patrimonio_atual, 0)
+        
+        fluxo.append({
+            'ano': ano_calendario,
+            'idade_ana': idade_ana,
+            'patrimonio': patrimonio_atual,
+            'rendimentos': rendimentos,
+            'saidas': saidas_anuais,
+            'saldo_liquido': saldo_liquido,
+            'ana_viva': ana_viva,
+            'renda_filhos_ativa': idade_ana >= idade_inicio_filhos and idade_ana > expectativa,
+            'doacoes_ativas': ano < PERIODO_DOACOES,
+            
+            # NOVOS CAMPOS PARA FAZENDA
+            'compra_fazenda': compra_fazenda,
+            'valor_gasto_fazenda': valor_gasto_fazenda,
+            'liquidez_necessaria_pct': liquidez_info['liquidez_pct'],
+            'liquidez_fase': liquidez_info['fase'],
+            'liquidez_descricao': liquidez_info.get('descricao', ''),
+            
+            # DESPESAS DETALHADAS
+            'despesas_ana': despesas * 12 if ana_viva else 0,
+            'doacoes': DOACOES * 12 if ano < PERIODO_DOACOES else 0,
+            'renda_filhos': RENDA_FILHOS * 12 if idade_ana >= idade_inicio_filhos and idade_ana > expectativa else 0
+        })
+    
+    return fluxo
+
+def calcular_patrimonio_disponivel_periodo(periodo_compra, valor_fazenda_atual, taxa, expectativa, despesas, inicio_renda_filhos, perfil_investimento):
+    """
+    Calcula quanto patrimônio estará disponível no período especificado para compra da fazenda
+    
+    Args:
+        periodo_compra (int): Anos até a compra
+        valor_fazenda_atual (float): Valor atual da fazenda
+        demais parâmetros: Parâmetros do plano patrimonial
+    
+    Returns:
+        dict: Análise de viabilidade da compra
+    """
+    if periodo_compra <= 0:
+        return {'disponivel': 0, 'necessario': valor_fazenda_atual, 'viavel': False}
+    
+    # Valor futuro da fazenda
+    valor_fazenda_futuro = calcular_valor_futuro_fazenda(valor_fazenda_atual, periodo_compra)
+    
+    # Gerar projeção completa
+    projecao = gerar_projecao_fluxo_com_fazenda(taxa, expectativa, despesas, 
+                                               periodo_compra + 5, inicio_renda_filhos, 
+                                               periodo_compra, valor_fazenda_futuro)
+    
+    # Patrimônio no ano da compra
+    if len(projecao) >= periodo_compra:
+        item_ano_compra = projecao[periodo_compra - 1]
+        patrimonio_disponivel = item_ano_compra['patrimonio']
+        
+        # Liquidez necessária no ano
+        liquidez_info = calcular_liquidez_necessaria_ano(periodo_compra, periodo_compra, valor_fazenda_futuro)
+        liquidez_minima_pos_compra = patrimonio_disponivel * (liquidez_info['liquidez_pct'] / 100)
+        
+        # Valor realmente disponível = patrimônio - liquidez mínima pós-compra
+        valor_disponivel_fazenda = patrimonio_disponivel - liquidez_minima_pos_compra
+    else:
+        patrimonio_disponivel = 0
+        valor_disponivel_fazenda = 0
+    
+    viabilidade = {
+        'disponivel': valor_disponivel_fazenda,
+        'necessario': valor_fazenda_futuro,
+        'viavel': valor_disponivel_fazenda >= valor_fazenda_futuro,
+        'patrimonio_total_periodo': patrimonio_disponivel,
+        'liquidez_minima_pos_compra': liquidez_minima_pos_compra if 'liquidez_minima_pos_compra' in locals() else 0,
+        'periodo_compra': periodo_compra,
+        'valor_atual': valor_fazenda_atual,
+        'valor_futuro': valor_fazenda_futuro
+    }
+    
+    print(f"🎯 Viabilidade compra em {periodo_compra} anos:")
+    print(f"   Disponível: R$ {valor_disponivel_fazenda:,.0f}")
+    print(f"   Necessário: R$ {valor_fazenda_futuro:,.0f}")
+    print(f"   Status: {'✅ VIÁVEL' if viabilidade['viavel'] else '❌ INVIÁVEL'}")
+    
+    return viabilidade
 # ================ VALIDAÇÕES DE SANIDADE ================
 def validar_inputs(taxa, expectativa, despesas, inicio_renda_filhos=None):
     """
@@ -886,44 +1159,6 @@ def validar_capacidade_dual(patrimonio, rendimento_anual, despesas_ana, renda_fi
         'viavel': True,
         'margem_seguranca': rendimento_anual - saida_anual_total
     }
-
-def stress_test_longevidade(taxa, despesas, inicio_renda_filhos):
-    """Executa stress test para diferentes expectativas de vida"""
-    cenarios = {}
-    
-    for expectativa in [90, 95, 100, 105]:
-        try:
-            resultado = calcular_compromissos_v42_corrigido(taxa, expectativa, despesas, inicio_renda_filhos)
-            cenarios[f'expectativa_{expectativa}'] = {
-                'fazenda': resultado['fazenda'],
-                'status': determinar_status(resultado['fazenda'], resultado['percentual']),
-                'percentual': resultado['percentual']
-            }
-        except Exception as e:
-            cenarios[f'expectativa_{expectativa}'] = {
-                'fazenda': 0,
-                'status': 'erro',
-                'erro': str(e)
-            }
-    
-    # Identificar primeiro cenário crítico
-    primeiro_critico = None
-    for exp in [90, 95, 100, 105]:
-        key = f'expectativa_{exp}'
-        if cenarios[key]['status'] in ['crítico', 'erro']:
-            primeiro_critico = exp
-            break
-    
-    robustez = primeiro_critico is None or primeiro_critico >= 100
-    
-    return {
-        'cenarios': cenarios,
-        'primeiro_cenario_critico': primeiro_critico,
-        'robustez': robustez,
-        'recomendacao': 'Plano robusto' if robustez else f'Plano falha aos {primeiro_critico} anos'
-    }
-
-# ================ FUNÇÃO PRINCIPAL CORRIGIDA ================
 def calcular_compromissos_v42_corrigido(taxa, expectativa, despesas, inicio_renda_filhos, custo_fazenda=2_000_000, perfil_investimento='moderado'):
     """
     VERSÃO 4.2 - TODOS OS ERROS CORRIGIDOS:
@@ -1019,6 +1254,142 @@ def calcular_compromissos_v42_corrigido(taxa, expectativa, despesas, inicio_rend
         'corrected_version': '4.2-ALL-ERRORS-FIXED'
     }
 
+
+def stress_test_longevidade(taxa, despesas, inicio_renda_filhos):
+    """Executa stress test para diferentes expectativas de vida"""
+    cenarios = {}
+    
+    for expectativa in [90, 95, 100, 105]:
+        try:
+            resultado = calcular_compromissos_v42_corrigido(taxa, expectativa, despesas, inicio_renda_filhos)
+            cenarios[f'expectativa_{expectativa}'] = {
+                'fazenda': resultado['fazenda'],
+                'status': determinar_status(resultado['fazenda'], resultado['percentual']),
+                'percentual': resultado['percentual']
+            }
+        except Exception as e:
+            cenarios[f'expectativa_{expectativa}'] = {
+                'fazenda': 0,
+                'status': 'erro',
+                'erro': str(e)
+            }
+    
+    # Identificar primeiro cenário crítico
+    primeiro_critico = None
+    for exp in [90, 95, 100, 105]:
+        key = f'expectativa_{exp}'
+        if cenarios[key]['status'] in ['crítico', 'erro']:
+            primeiro_critico = exp
+            break
+    
+    robustez = primeiro_critico is None or primeiro_critico >= 100
+    
+    return {
+        'cenarios': cenarios,
+        'primeiro_cenario_critico': primeiro_critico,
+        'robustez': robustez,
+        'recomendacao': 'Plano robusto' if robustez else f'Plano falha aos {primeiro_critico} anos'
+    }
+
+
+# ================ MODIFICAÇÃO DA FUNÇÃO PRINCIPAL ================
+def calcular_compromissos_v43_com_fazenda(taxa, expectativa, despesas, inicio_renda_filhos, 
+                                         custo_fazenda, perfil_investimento,
+                                         periodo_compra_fazenda=None):
+    """
+    VERSÃO 4.3 - INCLUI COMPRA DA FAZENDA COM LIQUIDEZ GRADUAL
+    
+    Novos parâmetros:
+        periodo_compra_fazenda (int): Anos até compra da fazenda (None = não comprar)
+    """
+    
+    # Validar inputs existentes
+    validar_inputs(taxa, expectativa, despesas, inicio_renda_filhos)
+    
+    # Patrimônio disponível
+    patrimonio_disponivel = obter_patrimonio_disponivel(perfil_investimento)
+    
+    # Calcular compromissos básicos (sem fazenda)
+    resultado_base = calcular_compromissos_v42_corrigido(taxa, expectativa, despesas, 
+                                                        inicio_renda_filhos, 0, perfil_investimento)
+    
+    # ANÁLISE DA FAZENDA
+    fazenda_analysis = {}
+    
+    if periodo_compra_fazenda and periodo_compra_fazenda > 0:
+        # Valor futuro da fazenda
+        valor_fazenda_futuro = calcular_valor_futuro_fazenda(custo_fazenda, periodo_compra_fazenda)
+        
+        # Disponibilidade no período
+        viabilidade = calcular_patrimonio_disponivel_periodo(
+            periodo_compra_fazenda, custo_fazenda, taxa, expectativa, 
+            despesas, inicio_renda_filhos, perfil_investimento
+        )
+        
+        # Fases de liquidez
+        fases_liquidez = calcular_liquidez_por_fase(periodo_compra_fazenda)
+        
+        fazenda_analysis = {
+            'periodo_compra': periodo_compra_fazenda,
+            'valor_atual': custo_fazenda,
+            'valor_futuro': valor_fazenda_futuro,
+            'viabilidade': viabilidade,
+            'fases_liquidez': fases_liquidez,
+            'disponivel_periodo': viabilidade['disponivel'],
+            'necessario_periodo': viabilidade['necessario'],
+            'viavel': viabilidade['viavel']
+        }
+        
+        # Atualizar resultado para mostrar no card
+        if viabilidade['viavel']:
+            fazenda_disponivel = viabilidade['disponivel']
+            percentual_fazenda = (fazenda_disponivel / PATRIMONIO) * 100
+        else:
+            fazenda_disponivel = viabilidade['disponivel']  # Mostrar o que está disponível
+            percentual_fazenda = (fazenda_disponivel / PATRIMONIO) * 100
+            
+    else:
+        # Sem compra de fazenda - usar cálculo original
+        fazenda_disponivel = resultado_base['fazenda_disponivel']
+        percentual_fazenda = resultado_base['percentual_fazenda']
+        fazenda_analysis = {
+            'periodo_compra': None,
+            'valor_atual': custo_fazenda,
+            'valor_futuro': custo_fazenda,
+            'viavel': fazenda_disponivel >= custo_fazenda,
+            'disponivel_periodo': fazenda_disponivel,
+            'necessario_periodo': custo_fazenda
+        }
+    
+    # Arte/galeria = sobra após fazenda
+    valor_arte = max(0, fazenda_disponivel - fazenda_analysis['necessario_periodo']) if fazenda_analysis['viavel'] else 0
+    percentual_arte = (valor_arte / PATRIMONIO) * 100 if valor_arte > 0 else 0
+    
+    print(f"\n🏡 ANÁLISE FAZENDA v4.3:")
+    print(f"   • Período: {periodo_compra_fazenda or 'Imediato'} anos")
+    print(f"   • Valor hoje: {format_currency(custo_fazenda)}")
+    if periodo_compra_fazenda:
+        print(f"   • Valor futuro: {format_currency(fazenda_analysis['valor_futuro'])}")
+    print(f"   • Disponível: {format_currency(fazenda_disponivel)} ({percentual_fazenda:.1f}%)")
+    print(f"   • Status: {'✅ VIÁVEL' if fazenda_analysis['viavel'] else '❌ INVIÁVEL'}")
+    
+    return {
+        **resultado_base,  # Manter todos os campos existentes
+        
+        # SOBRESCREVER CAMPOS DA FAZENDA
+        'fazenda_disponivel': fazenda_disponivel,
+        'percentual_fazenda': percentual_fazenda,
+        'arte': valor_arte,
+        'percentual_arte': percentual_arte,
+        
+        # NOVOS CAMPOS PARA FAZENDA
+        'fazenda_analysis': fazenda_analysis,
+        'periodo_compra_fazenda': periodo_compra_fazenda,
+        'valor_fazenda_atual': custo_fazenda,
+        'valor_fazenda_futuro': fazenda_analysis.get('valor_futuro', custo_fazenda),
+        
+        'corrected_version': '4.3-FAZENDA-LIQUIDEZ-GRADUAL'
+    }
 
 def determinar_status(fazenda, percentual, thresholds=None):
     """
@@ -1948,6 +2319,7 @@ def preview_relatorio(tipo):
             'versao': 'EMERGENCY_SAFE'
         })
         
+        
     except Exception as e:
         print(f"❌ Erro geral no preview {tipo}: {str(e)}")
         # ÚLTIMO RECURSO - resposta que SEMPRE funciona
@@ -1963,10 +2335,114 @@ def preview_relatorio(tipo):
             'versao': 'FALLBACK_TOTAL'
         })
 
-
-
-
-
+# ================ NOVO ENDPOINT PARA PROJEÇÕES DETALHADAS ================
+@app.route('/api/projecoes-detalhadas')
+def projecoes_detalhadas():
+    """
+    Endpoint para projeções detalhadas incluindo compra da fazenda
+    """
+    try:
+        # Parâmetros básicos
+        taxa = float(request.args.get('taxa', 4.0))
+        expectativa = int(request.args.get('expectativa', 90))
+        despesas = float(request.args.get('despesas', 150000))
+        inicio_renda_filhos = request.args.get('inicio_renda_filhos', 'falecimento')
+        perfil = request.args.get('perfil', 'moderado')
+        
+        # NOVOS PARÂMETROS PARA FAZENDA
+        custo_fazenda = float(request.args.get('custo_fazenda', 2000000))
+        periodo_compra_fazenda = request.args.get('periodo_compra_fazenda')
+        
+        if periodo_compra_fazenda:
+            periodo_compra_fazenda = int(periodo_compra_fazenda)
+            if periodo_compra_fazenda <= 0:
+                periodo_compra_fazenda = None
+        
+        print(f"📊 Projeções detalhadas solicitadas:")
+        print(f"   Taxa: {taxa}%, Expectativa: {expectativa}, Fazenda em: {periodo_compra_fazenda or 'imediato'} anos")
+        
+        # Calcular dados com fazenda
+        resultado = calcular_compromissos_v43_com_fazenda(
+            taxa, expectativa, despesas, inicio_renda_filhos,
+            custo_fazenda, perfil, periodo_compra_fazenda
+        )
+        
+        # Gerar projeção detalhada
+        anos_projecao = min(40, max(20, (expectativa - IDADE_ANA) + 10))
+        
+        valor_fazenda_futuro = resultado.get('valor_fazenda_futuro', custo_fazenda)
+        projecao_anual = gerar_projecao_fluxo_com_fazenda(
+            taxa, expectativa, despesas, anos_projecao, inicio_renda_filhos,
+            periodo_compra_fazenda, valor_fazenda_futuro
+        )
+        
+        # Asset allocation temporal (simplificado para MVP)
+        allocation_temporal = []
+        for i, item in enumerate(projecao_anual[:20]):  # Primeiros 20 anos
+            liquidez_pct = item['liquidez_necessaria_pct']
+            allocation_temporal.append({
+                'ano': item['ano'],
+                'renda_fixa_br': max(20, 70 - liquidez_pct),  # Reduz conforme aumenta liquidez
+                'renda_fixa_int': 15,
+                'acoes_br': max(5, 15 - (liquidez_pct // 2)),
+                'acoes_int': 10,
+                'imoveis': 3,
+                'liquidez': liquidez_pct
+            })
+        
+        # Marcos temporais incluindo fazenda
+        marcos_temporais = []
+        
+        # Marco existente: fim doações
+        marcos_temporais.append({
+            'ano': 2025 + 15,
+            'idade_ana': IDADE_ANA + 15,
+            'evento': 'Fim das Doações',
+            'tipo': 'financeiro'
+        })
+        
+        # NOVO MARCO: compra da fazenda
+        if periodo_compra_fazenda:
+            marcos_temporais.append({
+                'ano': 2025 + periodo_compra_fazenda,
+                'idade_ana': IDADE_ANA + periodo_compra_fazenda,
+                'evento': f'Compra da Fazenda ({format_currency(valor_fazenda_futuro, True)})',
+                'tipo': 'fazenda'
+            })
+        
+        # Marco: expectativa de vida
+        marcos_temporais.append({
+            'ano': 2025 + (expectativa - IDADE_ANA),
+            'idade_ana': expectativa,
+            'evento': 'Expectativa de Vida Ana',
+            'tipo': 'pessoal'
+        })
+        
+        return jsonify({
+            'success': True,
+            'projecao_anual': projecao_anual,
+            'allocation_temporal': allocation_temporal,
+            'marcos_temporais': marcos_temporais,
+            'fazenda_analysis': resultado['fazenda_analysis'],
+            'fazenda_disponivel_periodo': resultado['fazenda_disponivel'],
+            'parametros': {
+                'taxa': taxa,
+                'expectativa': expectativa,
+                'periodo_compra_fazenda': periodo_compra_fazenda,
+                'valor_fazenda_atual': custo_fazenda,
+                'valor_fazenda_futuro': valor_fazenda_futuro
+            },
+            'timestamp': get_current_datetime_sao_paulo().isoformat(),
+            'versao': '4.3-PROJECOES-FAZENDA'
+        })
+        
+    except Exception as e:
+        print(f"❌ Erro em projeções detalhadas: {str(e)}")
+        return jsonify({
+            'success': False,
+            'erro': str(e),
+            'versao': '4.3-PROJECOES-FAZENDA'
+        }), 500
 
 
 
@@ -2013,50 +2489,40 @@ def dashboard():
         ''', 500
 
 @app.route('/api/dados')
-def api_dados():
-    """API principal - VERSÃO CORRIGIDA v4.1 COM LOGO"""
+def api_dados_v43():
+    """API principal - VERSÃO v4.3 COM FAZENDA"""
     try:
-        # Pegar parâmetros com validação
+        # Parâmetros básicos
         taxa = float(request.args.get('taxa', 4.0))
         expectativa = int(request.args.get('expectativa', 90))
         despesas = float(request.args.get('despesas', 150000))
         inicio_renda_filhos = request.args.get('inicio_renda_filhos', 'falecimento')
         custo_fazenda = float(request.args.get('custo_fazenda', 2_000_000))
+        perfil_investimento = request.args.get('perfil', 'moderado')
         
-        # NOVA FUNCIONALIDADE: Perfil de investimento dinâmico
-        perfil_investimento = request.args.get('perfil', 'moderado').lower()
-        if perfil_investimento not in ['conservador', 'moderado', 'balanceado']:
-            perfil_investimento = 'moderado'  # Default
+        # NOVO PARÂMETRO: período de compra da fazenda
+        periodo_compra_fazenda = request.args.get('periodo_compra_fazenda')
+        if periodo_compra_fazenda:
+            try:
+                periodo_compra_fazenda = int(periodo_compra_fazenda)
+                if periodo_compra_fazenda <= 0:
+                    periodo_compra_fazenda = None
+            except:
+                periodo_compra_fazenda = None
         
-        # Converter início da renda se for numérico
-        try:
-            if inicio_renda_filhos.isdigit():
-                inicio_renda_filhos = int(inicio_renda_filhos)
-        except:
-            inicio_renda_filhos = 'falecimento'
+        print(f"📥 Parâmetros recebidos v4.3 COM FAZENDA:")
+        print(f"   Taxa: {taxa}% (real), Expectativa: {expectativa}, Fazenda: {periodo_compra_fazenda or 'imediato'} anos")
         
-        print(f"📥 Parâmetros recebidos v4.1 CORRIGIDA COM LOGO - Taxa: {taxa}% (real), Expectativa: {expectativa}, Despesas: R$ {despesas:,.0f}, Início filhos: {inicio_renda_filhos}, Perfil: {perfil_investimento}")
+        # USAR FUNÇÃO v4.3 COM FAZENDA
+        resultado = calcular_compromissos_v43_com_fazenda(
+            taxa, expectativa, despesas, inicio_renda_filhos, 
+            custo_fazenda, perfil_investimento, periodo_compra_fazenda
+        )
         
-        # USAR FUNÇÃO CORRIGIDA
-        resultado = calcular_compromissos_v42_corrigido(taxa, expectativa, despesas, inicio_renda_filhos, custo_fazenda, perfil_investimento)
         status = determinar_status(resultado['fazenda_disponivel'], resultado['percentual_fazenda'])
         
-        # Análise de sensibilidade (taxas de 2% a 8%)
-        sensibilidade = []
-        for t in [2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0, 7.0, 8.0]:
-            calc = calcular_compromissos_v42_corrigido(t, expectativa, despesas, inicio_renda_filhos, custo_fazenda, perfil_investimento)
-            sensibilidade.append({
-            'taxa': t,
-            'fazenda': calc['fazenda_disponivel'],
-            'percentual': calc['percentual_fazenda'],
-            'arte': calc['arte']
-            })
-        
-        # Asset allocation baseado no perfil escolhido
+        # Asset allocation
         allocation = get_asset_allocation(perfil_investimento, PATRIMONIO)
-        
-        # Projeção de fluxo de caixa
-        fluxo_caixa = gerar_projecao_fluxo(taxa, expectativa, despesas, 20, inicio_renda_filhos)
         
         response_data = {
             'success': True,
@@ -2069,23 +2535,30 @@ def api_dados():
                 'filhos': resultado['filhos'],
                 'doacoes': resultado['doacoes'],
                 'arte': resultado['arte'],
-                'percentual_arte': resultado['percentual_arte']
+                'percentual_arte': resultado['percentual_arte'],
+                
+                # NOVOS CAMPOS v4.3
+                'fazenda_analysis': resultado['fazenda_analysis'],
+                'periodo_compra_fazenda': resultado['periodo_compra_fazenda'],
+                'valor_fazenda_atual': resultado['valor_fazenda_atual'],
+                'valor_fazenda_futuro': resultado['valor_fazenda_futuro']
             },
-            'versao': '4.1-CORRIGIDA-COM-LOGO',
+            'allocation': allocation,
+            'status': status,
+            'versao': '4.3-FAZENDA-LIQUIDEZ',
             'timestamp': get_current_datetime_sao_paulo().isoformat()
         }
         
-        # Log dos dados para debug
-        print(f"📊 v4.2 FINAL - Taxa: {taxa}% real, Fazenda: {format_currency(resultado['fazenda_disponivel'], True)}, Status: {status}")
+        print(f"✅ v4.3 - Fazenda em {periodo_compra_fazenda or 'imediato'} anos: {format_currency(resultado['fazenda_disponivel'], True)}")
         
         return jsonify(response_data)
         
     except Exception as e:
-        print(f"❌ Erro na API dados v4.1: {str(e)}")
+        print(f"❌ Erro na API dados v4.3: {str(e)}")
         return jsonify({
             'success': False,
             'erro': str(e),
-            'versao': '4.1-CORRIGIDA-COM-LOGO',
+            'versao': '4.3-FAZENDA-LIQUIDEZ',
             'timestamp': get_current_datetime_sao_paulo().isoformat()
         }), 500
 

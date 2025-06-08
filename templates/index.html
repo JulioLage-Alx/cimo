@@ -125,7 +125,6 @@
             </label>
             <input type="range" id="taxaRetorno" class="range-input" min="2" max="8" step="0.1" value="4.0">
             <div class="range-value" id="taxaDisplay">4.0%</div>
-            
         </div>
         
         <!-- Input existente: Expectativa de Vida -->
@@ -145,23 +144,23 @@
                    min="50000" max="1000000">
         </div>
         
-        <!-- NOVO INPUT: Perfil de Investimento -->
+        <!-- Input existente: Perfil de Investimento -->
         <div class="control-group">
             <label for="perfilInvestimento">Perfil de Investimento
-            <span class="tooltip" title="Define alocação de ativos e retorno esperado">*</span> </label>
+                <span class="tooltip" title="Define alocação de ativos e retorno esperado">*</span> 
+            </label>
             <select id="perfilInvestimento">
                 <option value="conservador">Conservador (3.5% a.a.)</option>
                 <option value="moderado" selected>Moderado (4.5% a.a.)</option>
-                <option value="balanceado">Balanceado (5.2% a.a.)</option>
+                <option value="balanceado">Agressivo (7.0% a.a.)</option>
             </select>
-          
         </div>
         
-            <!-- NOVO INPUT: Início da Renda dos Filhos -->
+        <!-- Input existente: Início da Renda dos Filhos -->
         <div class="control-group">
             <label for="inicioRendaFilhos">
                 Início da Renda dos Filhos
-                <span class="tooltip" title="Escolha quando os filhos devem começar a receber: ao falecimento de Ana, imediatamente ou a partir de certa idade">*</span>
+                <span class="tooltip" title="Escolha quando os filhos devem começar a receber">*</span>
             </label>
             <select id="inicioRendaFilhos">
                 <option value="falecimento" selected>Após falecimento de Ana</option>
@@ -170,18 +169,29 @@
                 <option value="70">Aos 70 anos de Ana</option>
                 <option value="75">Aos 75 anos de Ana</option>
             </select>
-            
+        </div>
+
+        <!-- ================ NOVOS CONTROLES DA FAZENDA (LADO A LADO) ================ -->
+        
+        <!-- NOVO: Período de Compra da Fazenda -->
+        <div class="control-group">
+            <label for="periodoCompraFazenda">
+                Compra da Fazenda (anos)
+                <span class="tooltip" title="Em quantos anos planeja comprar a fazenda (0 = não comprar)">*</span>
+            </label>
+            <input type="number" id="periodoCompraFazenda" value="15" min="0" max="95" step="1">
+           
         </div>
         
-        <!-- NOVO INPUT: Custo Estimado da Fazenda -->
+        <!-- NOVO: Valor da Fazenda (hoje) -->
         <div class="control-group">
-            <label for="custoFazenda">Custo Estimado da Fazenda (R$)
-            <span class="tooltip" title="Usado para calcular verba disponível para arte">*</span>
-            
+            <label for="valorFazendaAtual">
+                Valor da Fazenda (hoje)
+                <span class="tooltip" title="Custo estimado da fazenda em valores atuais">*</span>
             </label>
-            <input type="number" id="custoFazenda" value="2000000" step="100000" 
-                   min="500000" max="10000000">
-         
+            <input type="number" id="valorFazendaAtual" value="2000000" step="100000" 
+                   min="500000" max="20000000">
+            
         </div>
         
         <!-- Input existente: Status Sistema -->
@@ -194,11 +204,23 @@
         </div>
     </div>
     
-    <!-- NOVA SEÇÃO: Legenda de Unidades -->
+    <!-- NOVA SEÇÃO: Informações da Fazenda -->
+    <div class="fazenda-info-section" style="margin-top: 20px; padding: 16px; background: var(--gray-50); border-radius: 12px; border-left: 4px solid var(--accent);">
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+            <i class="fas fa-info-circle" style="color: var(--accent);"></i>
+            <strong style="color: var(--gray-700);">Informações da Compra</strong>
+        </div>
+        <div id="fazendaInfoContent" style="color: var(--gray-600); font-size: 0.875rem; line-height: 1.5;">
+            Configure o período e valor para ver a análise de viabilidade
+        </div>
+    </div>
+    
+    <!-- Legenda existente -->
     <div class="currency-legend" style="margin-top: 16px; padding: 12px; background: var(--gray-50); border-radius: 8px; font-size: 0.8rem; color: var(--gray-600);">
         <strong>💡 Legenda:</strong> M = milhões, k = mil | 
         <strong>Taxa:</strong> Sempre REAL (já descontada da inflação) |
-        <strong>Doações:</strong> Exatamente 15 anos
+        <strong>Doações:</strong> Exatamente 15 anos |
+        <strong>Fazenda:</strong> Liquidez gradual em fases
     </div>
 </section>
 
@@ -216,7 +238,7 @@
                 </div>
 
                 <!-- Metrics -->
-                <section class="metrics-grid fade-in">
+    <section class="metrics-grid fade-in">
     <!-- Patrimônio Total (OK) -->
     <div class="metric-card">
         <div class="metric-header">
@@ -235,21 +257,35 @@
     </div>
 
     <!-- Fazenda (OK) -->
-    <div class="metric-card">
-        <div class="metric-header">
-            <div class="metric-content">
-                <h3 id="valorFazenda">R$ 5,2M</h3>
-                <p>Disponível para Fazenda</p>
-                <div class="metric-trend positive" id="trendFazenda">
-                    <i class="fas fa-arrow-up"></i>
-                    <span id="percentualFazenda">8.0%</span>
-                </div>
-            </div>
-            <div class="metric-icon green">
-                <i class="fas fa-seedling"></i>
+    <div class="metric-card fazenda-card">
+    <div class="metric-header">
+        <div class="metric-content">
+            <h3 id="valorFazenda">R$ 5,2M</h3>
+            <p>Disponível para Fazenda</p>
+            <div class="metric-trend positive" id="trendFazenda">
+                <i class="fas fa-calendar"></i>
+                <span id="periodoFazendaDisplay">Em 15 anos</span>
             </div>
         </div>
+        <div class="metric-icon green">
+            <i class="fas fa-seedling"></i>
+        </div>
     </div>
+    <!-- NOVA SEÇÃO: Detalhes da fazenda -->
+    <div class="fazenda-details" style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-light);">
+        <div class="fazenda-comparison" id="fazendaComparison">
+            <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--gray-600);">
+                <span>Necessário:</span>
+                <span id="fazendaNecessario">R$ 3,4M</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--gray-600); margin-top: 4px;">
+                <span>Disponível:</span>
+                <span id="fazendaDisponivel">R$ 5,2M</span>
+            </div>
+        </div>
+        
+    </div>
+</div>
 
     <!-- Compromissos (OK) -->
     <div class="metric-card">
@@ -706,219 +742,533 @@
             </div>
         </div>
 
-        <!-- Include other pages (keeping existing ones) -->
-        <!-- Asset Allocation Page -->
         <div class="page-content" id="allocationPage">
-            <header class="header">
-                <div class="header-left">
-                    <button class="toggle-sidebar">
-                        <i class="fas fa-bars"></i>
-                    </button>
-                    <div class="page-title">
-                        <h1>Asset Allocation</h1>
-                        <p>Distribuição estratégica de ativos do portfólio</p>
+    <header class="header">
+        <div class="header-left">
+            <button class="toggle-sidebar">
+                <i class="fas fa-bars"></i>
+            </button>
+            <div class="page-title">
+                <h1>Asset Allocation</h1>
+                <p>Estratégia de alocação de ativos e rebalanceamento</p>
+            </div>
+        </div>
+        <div class="header-right">
+            <button class="refresh-btn" onclick="DashboardController.loadDashboard()">
+                <i class="fas fa-sync-alt"></i>
+                <span>Atualizar</span>
+            </button>
+        </div>
+    </header>
+
+    <div class="dashboard">
+        <!-- Indicadores de Performance da Carteira -->
+        <section class="metrics-grid fade-in">
+            <div class="metric-card">
+                <div class="metric-header">
+                    <div class="metric-content">
+                        <h3 id="totalPatrimonio">R$ 65,0M</h3>
+                        <p>Patrimônio Total</p>
+                        <div class="metric-trend positive">
+                            <i class="fas fa-chart-line"></i>
+                            <span>Base de alocação</span>
+                        </div>
+                    </div>
+                    <div class="metric-icon blue">
+                        <i class="fas fa-wallet"></i>
                     </div>
                 </div>
-            </header>
+            </div>
+
+            <div class="metric-card">
+                <div class="metric-header">
+                    <div class="metric-content">
+                        <h3 id="retornoEsperadoCarteira">4.5%</h3>
+                        <p>Retorno Esperado</p>
+                        <div class="metric-trend positive">
+                            <i class="fas fa-percentage"></i>
+                            <span>Anual real</span>
+                        </div>
+                    </div>
+                    <div class="metric-icon green">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="metric-card">
+                <div class="metric-header">
+                    <div class="metric-content">
+                        <h3 id="volatiliadadeCarteira">10%</h3>
+                        <p>Volatilidade</p>
+                        <div class="metric-trend neutral">
+                            <i class="fas fa-wave-square"></i>
+                            <span>Risco controlado</span>
+                        </div>
+                    </div>
+                    <div class="metric-icon orange">
+                        <i class="fas fa-chart-bar"></i>
+                    </div>
+                </div>
+            </div>
+
             
-            <div class="dashboard">
-                <div class="charts-grid">
-                    <div class="chart-widget">
-                        <div class="widget-header">
-                            <h3 class="widget-title">
-                                <i class="fas fa-chart-pie"></i>
-                                Alocação Atual
-                            </h3>
-                        </div>
-                        <div class="chart-container" id="currentAllocationContainer">
-                            <canvas id="currentAllocationChart" style="display: none;"></canvas>
-                            <div class="chart-placeholder loading">
-                                <i class="fas fa-spinner"></i>
-                                <div>Carregando gráfico...</div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="chart-widget">
-                        <div class="widget-header">
-                            <h3 class="widget-title">
-                                <i class="fas fa-chart-bar"></i>
-                                Comparação com Benchmark
-                            </h3>
-                        </div>
-                        <div class="chart-container" id="benchmarkContainer">
-                            <canvas id="benchmarkChart" style="display: none;"></canvas>
-                            <div class="chart-placeholder loading">
-                                <i class="fas fa-spinner"></i>
-                                <div>Carregando gráfico...</div>
-                            </div>
-                        </div>
+        </section>
+
+        <!-- Gráficos de Asset Allocation -->
+        <section class="charts-grid fade-in">
+            <!-- Gráfico 1: Alocação Atual -->
+            <div class="chart-widget">
+                <div class="widget-header">
+                    <h3 class="widget-title">
+                        <i class="fas fa-chart-pie"></i>
+                        Alocação Atual
+                    </h3>
+                    <div class="widget-actions">
+                        <button class="widget-action" onclick="exportChart('currentAllocation')">
+                            <i class="fas fa-download"></i>
+                        </button>
                     </div>
                 </div>
-                
-                <div class="data-table">
-                    <div class="table-header">
-                        <h3 class="table-title">
-                            <i class="fas fa-list"></i>
-                            Detalhamento da Alocação
-                        </h3>
+                <div class="chart-container" id="currentAllocationContainer">
+                    <canvas id="currentAllocationChart" style="display: none;"></canvas>
+                    <div class="chart-placeholder loading">
+                        <i class="fas fa-spinner"></i>
+                        <div>Carregando alocação atual...</div>
                     </div>
-                    <div class="table-content">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Classe de Ativo</th>
-                                    <th>Alocação Atual</th>
-                                    <th>Valor (R$)</th>
-                                    <th>Retorno Esperado</th>
-                                    <th>Risco (Volatilidade)</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td>Renda Fixa Nacional</td>
-                                    <td>40%</td>
-                                    <td>R$ 26,0M</td>
-                                    <td>3.5% a.a.</td>
-                                    <td>Baixo (2-4%)</td>
-                                </tr>
-                                <tr>
-                                    <td>Renda Fixa Internacional</td>
-                                    <td>15%</td>
-                                    <td>R$ 9,8M</td>
-                                    <td>2.5% a.a.</td>
-                                    <td>Baixo-Médio (3-6%)</td>
-                                </tr>
-                                <tr>
-                                    <td>Multimercado</td>
-                                    <td>15%</td>
-                                    <td>R$ 9,8M</td>
-                                    <td>4.5% a.a.</td>
-                                    <td>Médio (5-8%)</td>
-                                </tr>
-                                <tr>
-                                    <td>Ações Brasil</td>
-                                    <td>10%</td>
-                                    <td>R$ 6,5M</td>
-                                    <td>6.0% a.a.</td>
-                                    <td>Alto (15-25%)</td>
-                                </tr>
-                                <tr>
-                                    <td>Ações Internacionais</td>
-                                    <td>10%</td>
-                                    <td>R$ 6,5M</td>
-                                    <td>5.5% a.a.</td>
-                                    <td>Alto (12-20%)</td>
-                                </tr>
-                                <tr>
-                                    <td>Imóveis/REITs</td>
-                                    <td>5%</td>
-                                    <td>R$ 3,3M</td>
-                                    <td>4.0% a.a.</td>
-                                    <td>Médio (8-12%)</td>
-                                </tr>
-                                <tr>
-                                    <td>Reserva de Liquidez</td>
-                                    <td>5%</td>
-                                    <td>R$ 3,3M</td>
-                                    <td>1.5% a.a.</td>
-                                    <td>Muito Baixo (0-1%)</td>
-                                </tr>
-                            </tbody>
-                        </table>
+                </div>
+            </div>
+
+            <!-- Gráfico 2: Benchmark Comparison -->
+            <div class="chart-widget">
+                <div class="widget-header">
+                    <h3 class="widget-title">
+                        <i class="fas fa-chart-bar"></i>
+                        vs. Benchmark
+                    </h3>
+                    <div class="widget-actions">
+                        <button class="widget-action" onclick="exportChart('benchmark')">
+                            <i class="fas fa-download"></i>
+                        </button>
                     </div>
+                </div>
+                <div class="chart-container" id="benchmarkContainer">
+                    <canvas id="benchmarkChart" style="display: none;"></canvas>
+                    <div class="chart-placeholder loading">
+                        <i class="fas fa-spinner"></i>
+                        <div>Carregando benchmark...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Gráfico 3: Evolução Temporal (NOVO) -->
+            <div class="chart-widget full-width">
+                <div class="widget-header">
+                    <h3 class="widget-title">
+                        <i class="fas fa-chart-area"></i>
+                        Evolução da Allocation ao Longo do Tempo
+                    </h3>
+                    <div class="widget-actions">
+                        <button class="widget-action" onclick="exportChart('allocationTrends')">
+                            <i class="fas fa-download"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="chart-container large" id="allocationTrendsContainer">
+                    <canvas id="allocationTrendsChart" style="display: none;"></canvas>
+                    <div class="chart-placeholder loading">
+                        <i class="fas fa-spinner"></i>
+                        <div>Carregando evolução temporal...</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Tabela de Detalhamento -->
+        <section class="data-table fade-in">
+            <div class="table-header">
+                <h3 class="table-title">
+                    <i class="fas fa-table"></i>
+                    Detalhamento da Carteira por Classe de Ativo
+                </h3>
+                <div class="widget-actions">
+                    <button class="widget-action" onclick="exportTable()">
+                        <i class="fas fa-file-excel"></i>
+                        Exportar CSV
+                    </button>
+                </div>
+            </div>
+            <div class="table-content">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Classe de Ativo</th>
+                            <th>Alocação Atual</th>
+                            <th>Valor (R$)</th>
+                            <th>Benchmark</th>
+                            <th>Diferença</th>
+                            <th>Rebalanceamento</th>
+                        </tr>
+                    </thead>
+                    <tbody id="allocationTableBody">
+                        <tr>
+                            <td colspan="6" style="text-align: center; padding: 40px; color: var(--gray-500);">
+                                Carregando detalhamento da carteira...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Recomendações de Rebalanceamento -->
+        <section class="alert success">
+            <i class="fas fa-lightbulb"></i>
+            <div>
+                <strong>Recomendação de Rebalanceamento:</strong>
+                <p style="margin: 8px 0 0 0;">
+                    A carteira está bem balanceada conforme o perfil moderado. 
+                    Considere aumentar ligeiramente a liquidez nos próximos 2 anos 
+                    para preparação da compra da fazenda.
+                </p>
+            </div>
+        </section>
+    </div>
+</div>
+<div class="page-content" id="projectionsPage">
+    <header class="header">
+        <div class="header-left">
+            <button class="toggle-sidebar">
+                <i class="fas fa-bars"></i>
+            </button>
+            <div class="page-title">
+                <h1>Projeções Financeiras</h1>
+                <p>Análise temporal do patrimônio e fluxos de caixa</p>
+            </div>
+        </div>
+        <div class="header-right">
+            <button class="refresh-btn" onclick="updateProjectionsData()">
+                <i class="fas fa-sync-alt"></i>
+                <span>Atualizar Projeções</span>
+            </button>
+        </div>
+    </header>
+    
+    <div class="dashboard">
+        <!-- Indicadores de Status da Projeção -->
+        <div class="projection-status-bar">
+            <div class="status-item">
+                <div class="status-icon">
+                    <i class="fas fa-chart-line"></i>
+                </div>
+                <div class="status-content">
+                    <span class="status-label">Taxa Atual</span>
+                    <span class="status-value" id="currentRate">4.0%</span>
+                </div>
+            </div>
+            <div class="status-item">
+                <div class="status-icon">
+                    <i class="fas fa-calendar-alt"></i>
+                </div>
+                <div class="status-content">
+                    <span class="status-label">Horizonte</span>
+                    <span class="status-value" id="projectionHorizon">37 anos</span>
+                </div>
+            </div>
+            <div class="status-item">
+                <div class="status-icon">
+                    <i class="fas fa-shield-alt"></i>
+                </div>
+                <div class="status-content">
+                    <span class="status-label">Perfil</span>
+                    <span class="status-value" id="currentProfile">Moderado</span>
+                </div>
+            </div>
+            <div class="status-item">
+                <div class="status-icon">
+                    <i class="fas fa-flag-checkered"></i>
+                </div>
+                <div class="status-content">
+                    <span class="status-label">Sustentabilidade</span>
+                    <span class="status-value" id="sustainabilityAge">89 anos</span>
                 </div>
             </div>
         </div>
 
-        <!-- Projections Page -->
-        <div class="page-content" id="projectionsPage">
-            <header class="header">
-                <div class="header-left">
-                    <button class="toggle-sidebar">
-                        <i class="fas fa-bars"></i>
-                    </button>
-                    <div class="page-title">
-                        <h1>Projeções Financeiras</h1>
-                        <p>Análise temporal do patrimônio e fluxos de caixa</p>
+        <div class="projection-grid">
+            <div class="chart-widget">
+                <div class="widget-header">
+                    <h3 class="widget-title">
+                        <i class="fas fa-chart-line"></i>
+                        Evolução Patrimonial
+                    </h3>
+                    <div class="widget-actions">
+                        <select id="projectionPeriod" onchange="updateProjectionPeriod()" class="projection-control">
+                            <option value="20">20 anos</option>
+                            <option value="30" selected>30 anos</option>
+                            <option value="40">40 anos</option>
+                        </select>
+                        <button class="widget-action" onclick="exportChart('patrimonialEvolution')">
+                            <i class="fas fa-download"></i>
+                        </button>
                     </div>
                 </div>
-            </header>
-            
-            <div class="dashboard">
-                <div class="projection-grid">
-                    <div class="chart-widget">
-                        <div class="widget-header">
-                            <h3 class="widget-title">
-                                <i class="fas fa-chart-line"></i>
-                                Evolução Patrimonial
-                            </h3>
-                        </div>
-                        <div class="chart-container large" id="patrimonialEvolutionContainer">
-                            <canvas id="patrimonialEvolutionChart" style="display: none;"></canvas>
-                            <div class="chart-placeholder loading">
-                                <i class="fas fa-spinner"></i>
-                                <div>Carregando gráfico...</div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="projection-summary">
-                        <h3>Resumo das Projeções</h3>
-                        <div class="projection-metric">
-                            <span>Patrimônio em 10 anos:</span>
-                            <strong>R$ 89,2M</strong>
-                        </div>
-                        <div class="projection-metric">
-                            <span>Patrimônio em 20 anos:</span>
-                            <strong>R$ 97,5M</strong>
-                        </div>
-                        <div class="projection-metric">
-                            <span>Patrimônio aos 90 anos:</span>
-                            <strong>R$ 0,8M</strong>
-                        </div>
-                        <div class="projection-metric">
-                            <span>Sustentabilidade:</span>
-                            <strong>Até 89 anos</strong>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="scenario-cards">
-                    <div class="scenario-card active" onclick="updateProjection('conservador')">
-                        <h4>Conservador</h4>
-                        <div class="value">3.0%</div>
-                        <div class="change">Taxa real a.a.</div>
-                    </div>
-                    <div class="scenario-card" onclick="updateProjection('moderado')">
-                        <h4>Moderado</h4>
-                        <div class="value">4.5%</div>
-                        <div class="change">Taxa real a.a.</div>
-                    </div>
-                    <div class="scenario-card" onclick="updateProjection('agressivo')">
-                        <h4>Agressivo</h4>
-                        <div class="value">6.0%</div>
-                        <div class="change">Taxa real a.a.</div>
-                    </div>
-                </div>
-                
-                <div class="chart-widget">
-                    <div class="widget-header">
-                        <h3 class="widget-title">
-                            <i class="fas fa-chart-area"></i>
-                            Fluxo de Caixa Projetado
-                        </h3>
-                    </div>
-                    <div class="chart-container" id="cashFlowContainer">
-                        <canvas id="cashFlowChart" style="display: none;"></canvas>
-                        <div class="chart-placeholder loading">
-                            <i class="fas fa-spinner"></i>
-                            <div>Carregando gráfico...</div>
-                        </div>
+                <div class="chart-container large" id="patrimonialEvolutionContainer">
+                    <canvas id="patrimonialEvolutionChart" style="display: none;"></canvas>
+                    <div class="chart-placeholder loading">
+                        <i class="fas fa-spinner"></i>
+                        <div>Carregando gráfico...</div>
                     </div>
                 </div>
             </div>
+            
+            <div class="projection-summary">
+                <h3>
+                    <i class="fas fa-calculator"></i>
+                    Resumo das Projeções
+                </h3>
+                <div class="projection-metric">
+                    <span>Patrimônio em 10 anos:</span>
+                    <strong id="patrimonio10Anos">Calculando...</strong>
+                    <div class="metric-trend">
+                        <i class="fas fa-info-circle" id="trend10Anos"></i>
+                    </div>
+                </div>
+                <div class="projection-metric">
+                    <span>Patrimônio em 20 anos:</span>
+                    <strong id="patrimonio20Anos">Calculando...</strong>
+                    <div class="metric-trend">
+                        <i class="fas fa-info-circle" id="trend20Anos"></i>
+                    </div>
+                </div>
+                <div class="projection-metric">
+                    <span>Patrimônio aos <span id="expectativaAge">90</span> anos:</span>
+                    <strong id="patrimonioExpectativa">Calculando...</strong>
+                    <div class="metric-trend">
+                        <i class="fas fa-info-circle" id="trendExpectativa"></i>
+                    </div>
+                </div>
+                <div class="projection-metric">
+                    <span>Primeiro Déficit:</span>
+                    <strong id="primeiroDeficit">Calculando...</strong>
+                    <div class="metric-trend">
+                        <i class="fas fa-exclamation-triangle" id="trendDeficit"></i>
+                    </div>
+                </div>
+                <div class="projection-metric highlight">
+                    <span>Status Geral:</span>
+                    <strong id="statusGeral">Analisando...</strong>
+                </div>
+            </div>
         </div>
+        
+        <!-- Cenários de Projeção Expandidos -->
+        <div class="scenario-cards">
+            <!-- Card Atual baseado nos parâmetros do usuário -->
+            <div class="scenario-card current active" onclick="updateProjection('atual')" id="currentScenarioCard">
+                <h4>Atual</h4>
+                <div class="value" id="currentScenarioRate">4.0%</div>
+                <div class="change">Seus parâmetros</div>
+                <div class="scenario-detail" id="currentScenarioDetail">
+                    Configuração ativa
+                </div>
+            </div>
+            
+            <div class="scenario-card" onclick="updateProjection('conservador')">
+                <h4>Conservador</h4>
+                <div class="value">3.5%</div>
+                <div class="change">Taxa real a.a.</div>
+                <div class="scenario-detail">
+                    Baixo risco, retorno estável
+                </div>
+            </div>
+            
+            <div class="scenario-card" onclick="updateProjection('moderado')">
+                <h4>Moderado</h4>
+                <div class="value">4.5%</div>
+                <div class="change">Taxa real a.a.</div>
+                <div class="scenario-detail">
+                    Equilíbrio risco-retorno
+                </div>
+            </div>
+            
+
+            
+            <div class="scenario-card" onclick="updateProjection('agressivo')">
+                <h4>Agressivo</h4>
+                <div class="value">7.0%</div>
+                <div class="change">Taxa real a.a.</div>
+                <div class="scenario-detail">
+                    Alto retorno, maior volatilidade
+                </div>
+            </div>
+        </div>
+        <div class="fazenda-timeline-section" style="margin: 24px 0;">
+    <div class="widget-header">
+        <h3 class="widget-title">
+            <i class="fas fa-map-marker-alt"></i>
+            Cronograma da Fazenda
+        </h3>
+    </div>
+    <div class="fazenda-timeline" id="fazendaTimeline">
+        <!-- Será populado dinamicamente -->
+    </div>
+</div>
+
+        <!-- Análise de Marcos Temporais -->
+        <div class="milestones-section">
+            <div class="widget-header">
+                <h3 class="widget-title">
+                    <i class="fas fa-map-marker-alt"></i>
+                    Marcos Temporais Importantes
+                </h3>
+            </div>
+            <div class="milestones-grid" id="milestonesGrid">
+                <!-- Marcos serão populados dinamicamente -->
+            </div>
+        </div>
+        
+        <div class="cash-flow-charts" style="margin: 24px 0;">
+    <div class="charts-grid">
+        <!-- Gráfico 1: Despesas (Saídas) -->
+        <div class="chart-widget">
+            <div class="widget-header">
+                <h3 class="widget-title">
+                    <i class="fas fa-arrow-down"></i>
+                    Despesas Projetadas
+                </h3>
+                <div class="widget-actions">
+                    <button class="widget-action" onclick="exportChart('despesasFlow')">
+                        <i class="fas fa-download"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="chart-container" id="despesasFlowContainer">
+                <canvas id="despesasFlowChart" style="display: none;"></canvas>
+                <div class="chart-placeholder loading">
+                    <i class="fas fa-spinner"></i>
+                    <div>Carregando despesas...</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Gráfico 2: Rentabilidade (Entradas) -->
+        <div class="chart-widget">
+            <div class="widget-header">
+                <h3 class="widget-title">
+                    <i class="fas fa-arrow-up"></i>
+                    Rentabilidade Projetada
+                </h3>
+                <div class="widget-actions">
+                    <button class="widget-action" onclick="exportChart('rentabilidadeFlow')">
+                        <i class="fas fa-download"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="chart-container" id="rentabilidadeFlowContainer">
+                <canvas id="rentabilidadeFlowChart" style="display: none;"></canvas>
+                <div class="chart-placeholder loading">
+                    <i class="fas fa-spinner"></i>
+                    <div>Carregando rentabilidade...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ================ NOVO GRÁFICO DE ASSET ALLOCATION TEMPORAL ================ -->
+
+<div class="chart-widget full-width">
+    <div class="widget-header">
+        <h3 class="widget-title">
+            <i class="fas fa-chart-area"></i>
+            Evolução da Asset Allocation
+        </h3>
+        <div class="widget-actions">
+            <div class="allocation-controls" style="display: flex; gap: 8px; margin-right: 12px;">
+                <label style="font-size: 0.8rem; color: var(--gray-600);">Mostrar:</label>
+                <label class="allocation-checkbox">
+                    <input type="checkbox" id="showRendaFixaBR" checked>
+                    <span style="font-size: 0.8rem;">RF BR</span>
+                </label>
+                <label class="allocation-checkbox">
+                    <input type="checkbox" id="showRendaFixaInt" checked>
+                    <span style="font-size: 0.8rem;">RF Int</span>
+                </label>
+                <label class="allocation-checkbox">
+                    <input type="checkbox" id="showAcoesBR" checked>
+                    <span style="font-size: 0.8rem;">Ações BR</span>
+                </label>
+                <label class="allocation-checkbox">
+                    <input type="checkbox" id="showAcoesInt" checked>
+                    <span style="font-size: 0.8rem;">Ações Int</span>
+                </label>
+                <label class="allocation-checkbox">
+                    <input type="checkbox" id="showImoveis" checked>
+                    <span style="font-size: 0.8rem;">Imóveis</span>
+                </label>
+                <label class="allocation-checkbox">
+                    <input type="checkbox" id="showMultimercado" checked>
+                    <span style="font-size: 0.8rem;">Multi</span>
+                </label>
+                <label class="allocation-checkbox">
+                    <input type="checkbox" id="showLiquidez" checked>
+                    <span style="font-size: 0.8rem;">Liquidez</span>
+                </label>
+            </div>
+            <button class="widget-action" onclick="exportChart('allocationEvolution')">
+                <i class="fas fa-download"></i>
+            </button>
+        </div>
+    </div>
+    <div class="chart-container large" id="allocationEvolutionContainer">
+        <canvas id="allocationEvolutionChart" style="display: none;"></canvas>
+        <div class="chart-placeholder loading">
+            <i class="fas fa-spinner"></i>
+            <div>Carregando evolução da carteira...</div>
+        </div>
+    </div>
+</div>
+        <!-- Tabela de Projeção Detalhada -->
+        <div class="data-table">
+            <div class="table-header">
+                <h3 class="table-title">
+                    <i class="fas fa-table"></i>
+                    Projeção Patrimonial Detalhada
+                </h3>
+                <div class="widget-actions">
+                    <button class="widget-action" onclick="exportProjectionTable()">
+                        <i class="fas fa-file-excel"></i>
+                        Exportar Dados
+                    </button>
+                </div>
+            </div>
+            <div class="table-content">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Ano</th>
+                            <th>Idade Ana</th>
+                            <th>Patrimônio</th>
+                            <th>Rendimentos</th>
+                            <th>Saídas</th>
+                            <th>Saldo Líquido</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="projectionTableBody">
+                        <tr>
+                            <td colspan="7" style="text-align: center; padding: 40px; color: var(--gray-500);">
+                                Carregando projeções detalhadas...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
 
         <!-- Scenarios Page -->
         <div class="page-content" id="scenariosPage">

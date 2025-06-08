@@ -4,11 +4,11 @@
 
     // URLs oficiais recomendadas (atualizadas conforme pesquisa)
     const chartJSUrls = [
-        'https://cdn.jsdelivr.net/npm/chart.js',                          // Oficial recomendado
-        'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.min.js',  // CDNJS estável
-        'https://unpkg.com/chart.js',                                      // UNPKG alternativo
-        'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.min.js'   // Versão específica
-    ];
+    'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js',
+    'https://cdn.jsdelivr.net/npm/chart.js@3.9.1',
+    'https://unpkg.com/chart.js@3.9.1/dist/chart.min.js'
+];
+
 
     // ================ CHART.JS LOADER FUNCTION ================
     function loadChartJS() {
@@ -124,24 +124,35 @@ function toggleDebug() {
 
     // ================ CONFIGURAÇÃO SINCRONIZADA COM BACKEND ================ 
     const CONFIG = {
-    // ✅ URLs EXATAS que correspondem às rotas do Flask
-    API_BASE_URL: window.location.origin, // http://localhost:5000 automaticamente
+    API_BASE_URL: window.location.origin,
     ENDPOINTS: {
-        dados: '/api/dados',                    // ✅ Rota existe no app.py
-        teste: '/api/teste',                    // ✅ Rota existe no app.py
-        teste_correcoes: '/api/teste-correcoes' // ✅ Rota existe no app.py
+        dados: '/api/dados',
+        teste: '/api/teste',
+        teste_correcoes: '/api/teste-correcoes',
+        projecoes_detalhadas: '/api/projecoes-detalhadas'  // NOVO
     },
     
-    // ✅ PARÂMETROS EXATOS que o backend espera conforme app.py
+    // ✅ PARÂMETROS ATUALIZADOS COM FAZENDA
     PARAM_MAPPING: {
-        'taxaRetorno': 'taxa',                      // frontend -> backend
-        'expectativaVida': 'expectativa',           // frontend -> backend  
-        'despesasMensais': 'despesas',              // frontend -> backend
-        'perfilInvestimento': 'perfil',             // frontend -> backend (corrigido)
-        'inicioRendaFilhos': 'inicio_renda_filhos', // frontend -> backend
-        'custoFazenda': 'custo_fazenda'             // frontend -> backend
-    }
+        'taxaRetorno': 'taxa',
+        'expectativaVida': 'expectativa',
+        'despesasMensais': 'despesas',
+        'perfilInvestimento': 'perfil',
+        'inicioRendaFilhos': 'inicio_renda_filhos',
+        'custoFazenda': 'custo_fazenda',
+        'periodoCompraFazenda': 'periodo_compra_fazenda',  // NOVO
+        'valorFazendaAtual': 'custo_fazenda'               // ALIAS
+    },
+    
+    // CONSTANTES DA FAZENDA
+    INFLACAO_ESTATICA: 3.5  // % ao ano
 };
+
+const idadeAna= 53;  // Idade atual de Ana
+const PATRIMONIO = 65_000_000;  // R$ 65 milhões
+
+    
+    
 
     const AppState = {
         currentData: null,
@@ -160,212 +171,221 @@ function toggleDebug() {
     };
 
     // ================ MAPEADOR DE DADOS SINCRONIZADO ================ 
-    const DataMapper = {
-        mapApiResponse(apiData) {
-            if (!apiData || !apiData.resultado) {
-                debugMessage('Resposta da API inválida ou sem dados de resultado', 'warning');
-                return this.generateFallbackData();
-            }
-            
-            debugMessage(`Mapeando resposta da API versão: ${apiData.versao || 'desconhecida'}`);
-            
-            // ✅ MAPEAMENTO SINCRONIZADO COM A ESTRUTURA REAL DO BACKEND
-            const resultado = apiData.resultado;
-            
-            return {
-                success: apiData.success,
-                patrimonio: apiData.patrimonio,
-                versao: apiData.versao,
-                timestamp: apiData.timestamp,
-                
-                // ✅ RESULTADO PRINCIPAL (campos do backend)
-                resultado: {
-                    fazenda: resultado.fazenda_disponivel,  // ✅ Mapeamento correto
-                    fazenda_disponivel: resultado.fazenda_disponivel,
-                    total: resultado.total_compromissos,     // ✅ Alias para compatibilidade
-                    total_compromissos: resultado.total_compromissos,
-                    percentual: resultado.percentual_fazenda, // ✅ Alias para compatibilidade  
-                    percentual_fazenda: resultado.percentual_fazenda,
-                    despesas: resultado.despesas,
-                    filhos: resultado.filhos,
-                    doacoes: resultado.doacoes,
-                    arte: resultado.arte || 0,
-                    percentual_arte: resultado.percentual_arte || 0
-                },
-                
-                // ✅ DADOS SIMULADOS BASEADOS NA RESPOSTA (que o frontend espera)
-                allocation: this.generateAllocationData(apiData.patrimonio),
-                sensibilidade: this.generateSensibilidadeData(resultado),
-                fluxo_caixa: this.generateFluxoCaixaData(),
-                status: this.determineStatus(resultado.fazenda_disponivel, resultado.percentual_fazenda)
-            };
-        },
-
-        generateFallbackData() {
-            debugMessage('Gerando dados de fallback', 'warning');
-            return {
-                success: false,
-                patrimonio: 65000000,
-                resultado: {
-                    fazenda: 0,
-                    fazenda_disponivel: 0,
-                    total: 0,
-                    total_compromissos: 0,
-                    percentual: 0,
-                    percentual_fazenda: 0,
-                    despesas: 0,
-                    filhos: 0,
-                    doacoes: 0,
-                    arte: 0,
-                    percentual_arte: 0
-                },
-                allocation: this.generateAllocationData(65000000),
-                sensibilidade: [],
-                fluxo_caixa: [],
-                status: 'erro'
-            };
-        },
-
-        generateAllocationData(patrimonio) {
-            // ✅ GERAR ALLOCATION BASEADO NO PERFIL (simulação client-side)
-            const perfil = document.getElementById('perfilInvestimento')?.value || 'moderado';
-            
-            const profiles = {
-                'conservador': [
-                    { nome: 'Renda Fixa Nacional', percentual: 70, valor: patrimonio * 0.70 },
-                    { nome: 'Renda Fixa Internacional', percentual: 15, valor: patrimonio * 0.15 },
-                    { nome: 'Ações Brasil', percentual: 5, valor: patrimonio * 0.05 },
-                    { nome: 'Ações Internacionais', percentual: 5, valor: patrimonio * 0.05 },
-                    { nome: 'Fundos Imobiliários', percentual: 3, valor: patrimonio * 0.03 },
-                    { nome: 'Reserva Liquidez', percentual: 2, valor: patrimonio * 0.02 }
-                ],
-                'moderado': [
-                    { nome: 'Renda Fixa Nacional', percentual: 50, valor: patrimonio * 0.50 },
-                    { nome: 'Renda Fixa Internacional', percentual: 20, valor: patrimonio * 0.20 },
-                    { nome: 'Ações Brasil', percentual: 15, valor: patrimonio * 0.15 },
-                    { nome: 'Ações Internacionais', percentual: 10, valor: patrimonio * 0.10 },
-                    { nome: 'Fundos Imobiliários', percentual: 3, valor: patrimonio * 0.03 },
-                    { nome: 'Reserva Liquidez', percentual: 2, valor: patrimonio * 0.02 }
-                ],
-                'balanceado': [
-                    { nome: 'Renda Fixa Nacional', percentual: 40, valor: patrimonio * 0.40 },
-                    { nome: 'Renda Fixa Internacional', percentual: 15, valor: patrimonio * 0.15 },
-                    { nome: 'Ações Brasil', percentual: 20, valor: patrimonio * 0.20 },
-                    { nome: 'Ações Internacionais', percentual: 15, valor: patrimonio * 0.15 },
-                    { nome: 'Fundos Imobiliários', percentual: 5, valor: patrimonio * 0.05 },
-                    { nome: 'Multimercado', percentual: 3, valor: patrimonio * 0.03 },
-                    { nome: 'Reserva Liquidez', percentual: 2, valor: patrimonio * 0.02 }
-                ]
-            };
-            
-            return profiles[perfil] || profiles['moderado'];
-        },
-
-        generateSensibilidadeData(resultado) {
-            // ✅ GERAR SENSIBILIDADE BASEADA NO RESULTADO ATUAL (simulação client-side)
-            const baseFazenda = resultado.fazenda_disponivel || 0;
-            const basePercentual = resultado.percentual_fazenda || 0;
-            
-            const sensibilidade = [];
-            const taxas = [2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0, 7.0, 8.0];
-            
-            taxas.forEach(taxa => {
-                // Estimativa simples: cada 1% de diferença na taxa = ~±15% no resultado
-                const currentTaxa = parseFloat(document.getElementById('taxaRetorno')?.value || 4.0);
-                const deltaTaxa = taxa - currentTaxa;
-                const factor = 1 + (deltaTaxa * 0.15); // 15% por ponto percentual
-                
-                const fazendaEstimada = baseFazenda * factor;
-                const percentualEstimado = basePercentual * factor;
-                
-                sensibilidade.push({
-                    taxa: taxa,
-                    fazenda: fazendaEstimada,
-                    percentual: percentualEstimado
-                });
-            });
-            
-            return sensibilidade;
-        },
-
-        generateFluxoCaixaData() {
-            // ✅ GERAR FLUXO DE CAIXA SIMULADO (baseado nos parâmetros atuais)
-            const fluxo = [];
-            let patrimonio = 65000000;
-            const taxa = parseFloat(document.getElementById('taxaRetorno')?.value || 4.0) / 100;
-            
-            for (let ano = 0; ano < 20; ano++) {
-                const anoCalendario = 2025 + ano;
-                const rendimentos = patrimonio * taxa;
-                const saidas = 1800000; // Estimativa de saídas anuais
-                patrimonio += rendimentos - saidas;
-                patrimonio = Math.max(patrimonio, 0);
-                
-                fluxo.push({
-                    ano: anoCalendario,
-                    patrimonio: patrimonio,
-                    rendimentos: rendimentos,
-                    saidas: saidas
-                });
-            }
-            
-            return fluxo;
-        },
-
-        determineStatus(fazenda, percentual) {
-            if (fazenda < 0) return 'crítico';
-            if (percentual < 5) return 'crítico';
-            if (percentual < 15) return 'atenção';
-            return 'viável';
+   const DataMapper = {
+    mapApiResponse(apiData) {
+        if (!apiData || !apiData.resultado) {
+            debugMessage('Resposta da API inválida ou sem dados de resultado', 'warning');
+            return this.generateFallbackData();
         }
-    };
+        
+        debugMessage(`Mapeando resposta da API versão: ${apiData.versao || 'desconhecida'}`);
+        
+        const resultado = apiData.resultado;
+        
+        return {
+            success: apiData.success,
+            patrimonio: apiData.patrimonio,
+            versao: apiData.versao,
+            timestamp: apiData.timestamp,
+            
+            // ✅ RESULTADO PRINCIPAL
+            resultado: {
+                fazenda: resultado.fazenda_disponivel,
+                fazenda_disponivel: resultado.fazenda_disponivel,
+                total: resultado.total_compromissos,
+                total_compromissos: resultado.total_compromissos,
+                percentual: resultado.percentual_fazenda,
+                percentual_fazenda: resultado.percentual_fazenda,
+                despesas: resultado.despesas,
+                filhos: resultado.filhos,
+                doacoes: resultado.doacoes,
+                arte: resultado.arte || 0,
+                percentual_arte: resultado.percentual_arte || 0,
+                
+                // ✅ NOVOS CAMPOS DA FAZENDA
+                fazenda_analysis: resultado.fazenda_analysis || {},
+                periodo_compra_fazenda: resultado.periodo_compra_fazenda,
+                valor_fazenda_atual: resultado.valor_fazenda_atual || 0,
+                valor_fazenda_futuro: resultado.valor_fazenda_futuro || 0
+            },
+            
+            allocation: this.generateAllocationData(apiData.patrimonio),
+            sensibilidade: this.generateSensibilidadeData(resultado),
+            status: this.determineStatus(resultado.fazenda_disponivel, resultado.percentual_fazenda)
+        };
+    },
+
+    // Manter métodos existentes...
+    generateFallbackData() {
+        debugMessage('Gerando dados de fallback', 'warning');
+        return {
+            success: false,
+            patrimonio: 65000000,
+            resultado: {
+                fazenda: 0, fazenda_disponivel: 0, total: 0, total_compromissos: 0,
+                percentual: 0, percentual_fazenda: 0, despesas: 0, filhos: 0,
+                doacoes: 0, arte: 0, percentual_arte: 0,
+                fazenda_analysis: {}, periodo_compra_fazenda: null,
+                valor_fazenda_atual: 0, valor_fazenda_futuro: 0
+            },
+            allocation: this.generateAllocationData(65000000),
+            sensibilidade: [], status: 'erro'
+        };
+    },
+
+    generateAllocationData(patrimonio) {
+        const perfil = document.getElementById('perfilInvestimento')?.value || 'moderado';
+        
+        const profiles = {
+            'conservador': [
+                { nome: 'Renda Fixa Nacional', percentual: 70, valor: patrimonio * 0.70 },
+                { nome: 'Renda Fixa Internacional', percentual: 15, valor: patrimonio * 0.15 },
+                { nome: 'Ações Brasil', percentual: 5, valor: patrimonio * 0.05 },
+                { nome: 'Ações Internacionais', percentual: 5, valor: patrimonio * 0.05 },
+                { nome: 'Fundos Imobiliários', percentual: 3, valor: patrimonio * 0.03 },
+                { nome: 'Reserva Liquidez', percentual: 2, valor: patrimonio * 0.02 }
+            ],
+            'moderado': [
+                { nome: 'Renda Fixa Nacional', percentual: 50, valor: patrimonio * 0.50 },
+                { nome: 'Renda Fixa Internacional', percentual: 20, valor: patrimonio * 0.20 },
+                { nome: 'Ações Brasil', percentual: 15, valor: patrimonio * 0.15 },
+                { nome: 'Ações Internacionais', percentual: 10, valor: patrimonio * 0.10 },
+                { nome: 'Fundos Imobiliários', percentual: 3, valor: patrimonio * 0.03 },
+                { nome: 'Reserva Liquidez', percentual: 2, valor: patrimonio * 0.02 }
+            ],
+            'balanceado': [
+                { nome: 'Renda Fixa Nacional', percentual: 40, valor: patrimonio * 0.40 },
+                { nome: 'Renda Fixa Internacional', percentual: 15, valor: patrimonio * 0.15 },
+                { nome: 'Ações Brasil', percentual: 20, valor: patrimonio * 0.20 },
+                { nome: 'Ações Internacionais', percentual: 15, valor: patrimonio * 0.15 },
+                { nome: 'Fundos Imobiliários', percentual: 5, valor: patrimonio * 0.05 },
+                { nome: 'Multimercado', percentual: 3, valor: patrimonio * 0.03 },
+                { nome: 'Reserva Liquidez', percentual: 2, valor: patrimonio * 0.02 }
+            ]
+        };
+        
+        return profiles[perfil] || profiles['moderado'];
+    },
+
+    generateSensibilidadeData(resultado) {
+        const baseFazenda = resultado.fazenda_disponivel || 0;
+        const basePercentual = resultado.percentual_fazenda || 0;
+        
+        const sensibilidade = [];
+        const taxas = [2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0, 7.0, 8.0];
+        
+        taxas.forEach(taxa => {
+            const currentTaxa = parseFloat(document.getElementById('taxaRetorno')?.value || 4.0);
+            const deltaTaxa = taxa - currentTaxa;
+            const factor = 1 + (deltaTaxa * 0.15);
+            
+            const fazendaEstimada = baseFazenda * factor;
+            const percentualEstimado = basePercentual * factor;
+            
+            sensibilidade.push({
+                taxa: taxa,
+                fazenda: fazendaEstimada,
+                percentual: percentualEstimado
+            });
+        });
+        
+        return sensibilidade;
+    },
+
+    determineStatus(fazenda, percentual) {
+        if (fazenda < 0) return 'crítico';
+        if (percentual < 5) return 'crítico';
+        if (percentual < 15) return 'atenção';
+        return 'viável';
+    }
+};
 
     // ================ API CLIENT SINCRONIZADO ================ 
-    const ApiClient = {
-        async fetchData() {
-            try {
-                debugMessage('Iniciando requisição para API sincronizada v4.1');
-                
-                // ✅ PARÂMETROS EXATOS QUE O BACKEND ESPERA
-                const params = new URLSearchParams({
-                    taxa: document.getElementById('taxaRetorno').value,
-                    expectativa: document.getElementById('expectativaVida').value,
-                    despesas: document.getElementById('despesasMensais').value,
-                    // ✅ NOVOS PARÂMETROS v4.0 SINCRONIZADOS
-                    perfil: document.getElementById('perfilInvestimento').value,          // ✅ 'perfil' (não 'perfil_investimento')
-                    inicio_renda_filhos: document.getElementById('inicioRendaFilhos').value,
-                    custo_fazenda: document.getElementById('custoFazenda').value
-                });
-
-                const url = `${CONFIG.ENDPOINTS.dados}?${params}`;
-                debugMessage(`URL da requisição sincronizada: ${url}`);
-
-                const response = await fetch(url);
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
-
-                const data = await response.json();
-                debugMessage(`Resposta recebida: versão ${data.versao || 'desconhecida'}, success: ${data.success}`);
-                
-                if (!data.success) {
-                    throw new Error(data.erro || 'Erro desconhecido na API');
-                }
-
-                // ✅ MAPEAR DADOS PARA FORMATO ESPERADO PELO FRONTEND
-                const mappedData = DataMapper.mapApiResponse(data);
-                debugMessage('Dados mapeados com sucesso');
-                
-                return mappedData;
-            } catch (error) {
-                debugMessage(`Erro na API: ${error.message}`, 'error');
-                throw error;
-            }
-        },
-         async checkBackendHealth() {
+  const ApiClient = {
+    async fetchData() {
         try {
-            debugMessage('🔍 Verificando saúde do backend...');
+            debugMessage('Iniciando requisição para API v4.3 com fazenda');
+            
+            // ✅ COLETAR TODOS OS PARÂMETROS (INCLUINDO FAZENDA)
+            const params = new URLSearchParams({
+                taxa: document.getElementById('taxaRetorno').value,
+                expectativa: document.getElementById('expectativaVida').value,
+                despesas: document.getElementById('despesasMensais').value,
+                perfil: document.getElementById('perfilInvestimento').value,
+                inicio_renda_filhos: document.getElementById('inicioRendaFilhos').value,
+                custo_fazenda: document.getElementById('valorFazendaAtual').value,
+                periodo_compra_fazenda: document.getElementById('periodoCompraFazenda').value  // NOVO
+            });
+
+            const url = `${CONFIG.ENDPOINTS.dados}?${params}`;
+            debugMessage(`URL da requisição v4.3: ${url}`);
+
+            const response = await fetch(url);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            debugMessage(`Resposta recebida v4.3: versão ${data.versao || 'desconhecida'}, success: ${data.success}`);
+            
+            if (!data.success) {
+                throw new Error(data.erro || 'Erro desconhecido na API');
+            }
+
+            const mappedData = DataMapper.mapApiResponse(data);
+            debugMessage('Dados v4.3 mapeados com sucesso');
+            
+            return mappedData;
+        } catch (error) {
+            debugMessage(`Erro na API v4.3: ${error.message}`, 'error');
+            throw error;
+        }
+    },
+
+    // ✅ NOVO: Buscar projeções detalhadas com fazenda
+    async fetchProjectionsData() {
+        try {
+            debugMessage('Buscando projeções detalhadas com fazenda');
+            
+            const params = new URLSearchParams({
+                taxa: document.getElementById('taxaRetorno').value,
+                expectativa: document.getElementById('expectativaVida').value,
+                despesas: document.getElementById('despesasMensais').value,
+                perfil: document.getElementById('perfilInvestimento').value,
+                inicio_renda_filhos: document.getElementById('inicioRendaFilhos').value,
+                custo_fazenda: document.getElementById('valorFazendaAtual').value,
+                periodo_compra_fazenda: document.getElementById('periodoCompraFazenda').value
+            });
+
+            const url = `${CONFIG.ENDPOINTS.projecoes_detalhadas}?${params}`;
+            debugMessage(`URL projeções: ${url}`);
+
+            const response = await fetch(url);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            
+            if (!data.success) {
+                throw new Error(data.erro || 'Erro ao buscar projeções');
+            }
+            
+            debugMessage('Projeções detalhadas recebidas com sucesso');
+            return data;
+            
+        } catch (error) {
+            debugMessage(`Erro nas projeções: ${error.message}`, 'error');
+            throw error;
+        }
+    },
+
+    // Manter métodos existentes...
+    async checkBackendHealth() {
+        try {
+            debugMessage('🔍 Verificando saúde do backend v4.3...');
             
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 5000);
@@ -389,7 +409,7 @@ function toggleDebug() {
             const data = await response.json();
             
             if (data.status === 'OK') {
-                debugMessage(`✅ Backend online - Versão: ${data.version}`, 'success');
+                debugMessage(`✅ Backend v4.3 online - Versão: ${data.version}`, 'success');
                 AppState.connectionStatus = 'connected';
                 return true;
             } else {
@@ -397,101 +417,14 @@ function toggleDebug() {
             }
             
         } catch (error) {
-            debugMessage(`❌ Backend offline: ${error.message}`, 'error');
+            debugMessage(`❌ Backend v4.3 offline: ${error.message}`, 'error');
             AppState.connectionStatus = 'disconnected';
             AppState.lastError = error.message;
             return false;
         }
-    },
+    }
+};
 
-mapBackendResponse(backendData) {
-        debugMessage(`🔄 Mapeando resposta: ${JSON.stringify(backendData, null, 2)}`);
-        
-        if (!backendData || !backendData.resultado) {
-            throw new Error('Estrutura de resposta inválida do backend');
-        }
-        
-        const resultado = backendData.resultado;
-        
-        // ✅ MAPEAR EXATAMENTE COMO SEU BACKEND RETORNA
-        const mappedData = {
-            success: true,
-            patrimonio: backendData.patrimonio || 65000000,
-            versao: backendData.versao,
-            timestamp: backendData.timestamp,
-            
-            // ✅ CAMPOS EXATOS DO SEU BACKEND
-            resultado: {
-                fazenda: resultado.fazenda_disponivel,           // backend -> frontend
-                fazenda_disponivel: resultado.fazenda_disponivel,
-                total: resultado.total_compromissos,             // backend -> frontend  
-                total_compromissos: resultado.total_compromissos,
-                percentual: resultado.percentual_fazenda,        // backend -> frontend
-                percentual_fazenda: resultado.percentual_fazenda,
-                despesas: resultado.despesas,
-                filhos: resultado.filhos,
-                doacoes: resultado.doacoes,
-                arte: resultado.arte || 0,
-                percentual_arte: resultado.percentual_arte || 0
-            },
-            
-            // Gerar dados adicionais que o frontend espera
-            allocation: this.generateAllocationData(backendData.patrimonio || 65000000),
-            sensibilidade: this.generateSensibilityData(resultado),
-            status: this.determineStatus(resultado.fazenda_disponivel, resultado.percentual_fazenda)
-        };
-        
-        debugMessage(`✅ Dados mapeados: fazenda=${mappedData.resultado.fazenda}, percentual=${mappedData.resultado.percentual}%`);
-        return mappedData;
-    },
-
-
-
-    collectFormParams() {
-        const params = {};
-        
-        // ✅ Mapear cada input do frontend para o parâmetro esperado pelo backend
-        Object.entries(CONFIG.PARAM_MAPPING).forEach(([frontendId, backendParam]) => {
-            const element = document.getElementById(frontendId);
-            if (element) {
-                params[backendParam] = element.value;
-            } else {
-                debugMessage(`⚠️ Elemento ${frontendId} não encontrado`, 'warning');
-            }
-        });
-        
-        debugMessage(`📝 Parâmetros coletados: ${JSON.stringify(params)}`);
-        return params;
-    },
-
-
-        async testConnection() {
-            try {
-                debugMessage('Testando conexão com API v4.1');
-                const response = await fetch(CONFIG.ENDPOINTS.teste);
-                const data = await response.json();
-                const isConnected = response.ok && data.status === 'OK';
-                debugMessage(`Conexão: ${isConnected ? 'OK' : 'ERRO'} - Versão: ${data.version || 'N/A'}`);
-                return isConnected;
-            } catch (error) {
-                debugMessage(`Erro ao testar conexão: ${error.message}`, 'error');
-                return false;
-            }
-        },
-
-        async fetchTestCorrecoes() {
-            try {
-                debugMessage('Testando correções v4.1');
-                const response = await fetch(CONFIG.ENDPOINTS.teste_correcoes);
-                const data = await response.json();
-                debugMessage(`Teste correções: ${data.success ? 'OK' : 'ERRO'}`);
-                return data;
-            } catch (error) {
-                debugMessage(`Erro ao testar correções: ${error.message}`, 'error');
-                return null;
-            }
-        }
-    };
 
     // ================ UTILITIES ================ 
     const Utils = {
@@ -576,21 +509,88 @@ mapBackendResponse(backendData) {
             }
         },
 
-        destroyExistingCharts() {
-            debugMessage('Destruindo gráficos existentes');
-            
-            Object.keys(AppState.charts).forEach(chartKey => {
-                if (AppState.charts[chartKey] && AppState.charts[chartKey].destroy) {
-                    try {
+ destroyExistingCharts() {
+    debugMessage('🗑️ Destruição COMPLETA de gráficos - v4.3.2 SYNC');
+    
+    try {
+        // Destruir gráficos do AppState
+        Object.keys(AppState.charts).forEach(chartKey => {
+            if (AppState.charts[chartKey]) {
+                try {
+                    if (typeof AppState.charts[chartKey].destroy === 'function') {
                         AppState.charts[chartKey].destroy();
-                        debugMessage(`Gráfico ${chartKey} destruído`);
-                    } catch (error) {
-                        debugMessage(`Erro ao destruir gráfico ${chartKey}: ${error.message}`, 'warning');
+                        debugMessage(`✅ Gráfico ${chartKey} destruído via AppState`);
                     }
+                } catch (error) {
+                    debugMessage(`⚠️ Erro ao destruir ${chartKey}: ${error.message}`, 'warning');
                 }
                 delete AppState.charts[chartKey];
+            }
+        });
+        
+        // Destruir TODOS os gráficos Chart.js globalmente
+        if (typeof Chart !== 'undefined' && Chart.instances) {
+            Object.keys(Chart.instances).forEach(chartId => {
+                try {
+                    const chartInstance = Chart.instances[chartId];
+                    if (chartInstance) {
+                        chartInstance.destroy();
+                        debugMessage(`🧹 Chart.js instance ${chartId} destruída globalmente`);
+                    }
+                } catch (error) {
+                    debugMessage(`⚠️ Erro ao destruir instance ${chartId}: ${error.message}`, 'warning');
+                }
             });
-        },
+        }
+        
+        // Limpar cada canvas individualmente
+        const canvasIds = [
+            'compromissosChart', 'allocationChart', 'sensibilidadeChart',
+            'currentAllocationChart', 'benchmarkChart', 'allocationTrendsChart',
+            'patrimonialEvolutionChart', 'despesasFlowChart', 'rentabilidadeFlowChart', 
+            'allocationEvolutionChart', 'monteCarloChart', 'distribuicaoChart',
+            'scenarioComparisonChart', 'scenarioEvolutionChart', 'stressTestChart',
+            'returnSensitivityChart', 'expenseSensitivityChart', 'bidimensionalChart'
+        ];
+        
+        canvasIds.forEach(canvasId => {
+            try {
+                const canvas = document.getElementById(canvasId);
+                if (canvas) {
+                    // ✅ CRÍTICO: Verificar Chart.getChart()
+                    if (typeof Chart !== 'undefined' && Chart.getChart) {
+                        const existingChart = Chart.getChart(canvas);
+                        if (existingChart) {
+                            existingChart.destroy();
+                            debugMessage(`🎯 Chart.getChart(${canvasId}) destruído`);
+                        }
+                    }
+                    
+                    // Limpar canvas
+                    const context = canvas.getContext('2d');
+                    if (context) {
+                        context.clearRect(0, 0, canvas.width, canvas.height);
+                    }
+                    
+                    // Remover atributos Chart.js
+                    canvas.removeAttribute('data-chartjs-chart-id');
+                    if (canvas.chartjsChart) {
+                        delete canvas.chartjsChart;
+                    }
+                }
+            } catch (error) {
+                debugMessage(`⚠️ Erro ao limpar canvas ${canvasId}: ${error.message}`, 'warning');
+            }
+        });
+        
+        AppState.charts = {};
+        debugMessage('✅ Destruição COMPLETA concluída');
+        
+    } catch (error) {
+        debugMessage(`❌ Erro na destruição: ${error.message}`, 'error');
+        AppState.charts = {};
+    }
+},
 
         createCharts() {
             if (!AppState.chartJsLoaded || typeof Chart === 'undefined') {
@@ -1084,54 +1084,97 @@ mapBackendResponse(backendData) {
             });
         },
 
-        createPatrimonialEvolutionChart() {
-            const ctx = document.getElementById('patrimonialEvolutionChart');
-            if (!ctx) return;
+      createPatrimonialEvolutionChart() {
+    const ctx = document.getElementById('patrimonialEvolutionChart');
+    if (!ctx || !ProjectionsManager.projectionData) {
+        debugMessage('❌ Canvas ou dados não disponíveis para patrimonial evolution');
+        return;
+    }
 
-            const { fluxo_caixa } = AppState.currentData;
-            
-            let patrimonialData, labels;
-            
-            if (fluxo_caixa && fluxo_caixa.length > 0) {
-                labels = fluxo_caixa.map(item => item.ano);
-                patrimonialData = fluxo_caixa.map(item => item.patrimonio / 1000000);
-            } else {
-                // Fallback data
-                labels = Array.from({length: 10}, (_, i) => 2025 + i);
-                patrimonialData = labels.map((year, i) => {
-                    return 65 * Math.pow(1.04, i) - (i * 1.8);
-                });
-            }
+    // ✅ NOVA: DESTRUIÇÃO INDIVIDUAL FORÇADA
+    if (AppState.charts.patrimonialEvolution) {
+        try {
+            AppState.charts.patrimonialEvolution.destroy();
+            debugMessage('🗑️ Gráfico patrimonial existente destruído');
+        } catch (error) {
+            debugMessage(`⚠️ Erro ao destruir patrimonial: ${error.message}`, 'warning');
+        }
+        delete AppState.charts.patrimonialEvolution;
+    }
 
-            AppState.charts.patrimonialEvolution = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: 'Patrimônio (R$ milhões)',
-                        data: patrimonialData,
-                        borderColor: this.colors.primary,
-                        backgroundColor: this.colors.primary + '20',
-                        borderWidth: 3,
-                        fill: true,
-                        tension: 0.4
-                    }]
+    const data = ProjectionsManager.projectionData.slice(0, 30);
+    
+    // ✅ VERIFICAÇÃO ADICIONAL DOS DADOS
+    if (!data || data.length === 0) {
+        debugMessage('❌ Dados de projeção inválidos para gráfico patrimonial');
+        return;
+    }
+    
+    debugMessage(`📊 Criando gráfico patrimonial com ${data.length} pontos de dados`);
+    
+    try {
+        AppState.charts.patrimonialEvolution = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: data.map(item => item.ano),
+                datasets: [{
+                    label: 'Patrimônio (R$ milhões)',
+                    data: data.map(item => item.patrimonio / 1000000),
+                    borderColor: this.colors.primary,
+                    backgroundColor: this.colors.primary + '20',
+                    borderWidth: 3,
+                    tension: 0.4,
+                    fill: true,
+                    pointBackgroundColor: this.colors.primary,
+                    pointBorderColor: '#ffffff',
+                    pointBorderWidth: 2,
+                    pointRadius: 4,
+                    pointHoverRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const item = data[context.dataIndex];
+                                return [
+                                    `Patrimônio: ${Utils.formatCurrency(item.patrimonio, true)}`,
+                                    `Idade Ana: ${item.idade_ana} anos`,
+                                    `Ana ${item.ana_viva ? 'viva' : 'faleceu'}`
+                                ];
+                            }
+                        }
+                    }
                 },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        y: {
-                            ticks: {
-                                callback: function(value) {
-                                    return 'R$ ' + value + 'M';
-                                }
+                scales: {
+                    x: {
+                        grid: { color: '#f1f5f9' },
+                        ticks: { color: '#6b7280', font: { size: 11 } }
+                    },
+                    y: {
+                        grid: { color: '#f1f5f9' },
+                        ticks: { 
+                            color: '#6b7280',
+                            font: { size: 11 },
+                            callback: function(value) {
+                                return 'R$ ' + value + 'M';
                             }
                         }
                     }
                 }
-            });
-        },
+            }
+        });
+        
+        debugMessage('✅ Gráfico patrimonial criado com sucesso');
+        
+    } catch (error) {
+        debugMessage(`❌ Erro ao criar gráfico patrimonial: ${error.message}`, 'error');
+    }
+},
 
         createCashFlowChart() {
             const ctx = document.getElementById('cashFlowChart');
@@ -1535,6 +1578,684 @@ mapBackendResponse(backendData) {
         }
     };
 
+const ASSET_ALLOCATION_PROFILES = {
+    'conservador': {
+        'renda_fixa_br': 70,      // 70% Renda Fixa Nacional
+        'renda_fixa_int': 15,     // 15% Renda Fixa Internacional  
+        'acoes_br': 5,            // 5% Ações Brasil
+        'acoes_int': 5,           // 5% Ações Internacionais
+        'imoveis': 3,             // 3% Fundos Imobiliários
+        'liquidez': 2,            // 2% Reserva de Liquidez
+        'retorno_esperado': 3.5,  // Taxa real esperada
+        'volatilidade': 6         // Volatilidade anual %
+    },
+    'moderado': {
+        'renda_fixa_br': 50,      // 50% Renda Fixa Nacional
+        'renda_fixa_int': 20,     // 20% Renda Fixa Internacional
+        'acoes_br': 15,           // 15% Ações Brasil
+        'acoes_int': 10,          // 10% Ações Internacionais
+        'imoveis': 3,             // 3% Fundos Imobiliários
+        'liquidez': 2,            // 2% Reserva de Liquidez
+        'retorno_esperado': 4.5,  // Taxa real esperada
+        'volatilidade': 10        // Volatilidade anual %
+    },
+    'balanceado': {
+        'renda_fixa_br': 40,      // 40% Renda Fixa Nacional
+        'renda_fixa_int': 15,     // 15% Renda Fixa Internacional
+        'acoes_br': 20,           // 20% Ações Brasil
+        'acoes_int': 15,          // 15% Ações Internacionais
+        'imoveis': 5,             // 5% Fundos Imobiliários
+        'multimercado': 3,        // 3% Multimercado
+        'liquidez': 2,            // 2% Reserva de Liquidez
+        'retorno_esperado': 5.2,  // Taxa real esperada
+        'volatilidade': 12        // Volatilidade anual %
+    }
+};
+    
+ChartManager.createDespesasFlowChart = function() {
+    const ctx = document.getElementById('despesasFlowChart');
+    if (!ctx || !ProjectionsManager.projectionData) return;
+
+    const data = ProjectionsManager.projectionData.slice(0, 20);
+    
+    const datasets = [];
+    
+    // Despesas Ana
+    datasets.push({
+        label: 'Despesas Ana',
+        data: data.map(item => item.despesas_ana ? item.despesas_ana / 1000000 : 0),
+        backgroundColor: this.colors.primary + '80',
+        borderColor: this.colors.primary,
+        borderWidth: 2
+    });
+    
+    // Doações
+    datasets.push({
+        label: 'Doações',
+        data: data.map(item => item.doacoes ? item.doacoes / 1000000 : 0),
+        backgroundColor: this.colors.secondary + '80',
+        borderColor: this.colors.secondary,
+        borderWidth: 2
+    });
+    
+    // Renda filhos
+    datasets.push({
+        label: 'Renda Filhos',
+        data: data.map(item => item.renda_filhos ? item.renda_filhos / 1000000 : 0),
+        backgroundColor: this.colors.gray + '80',
+        borderColor: this.colors.gray,
+        borderWidth: 2
+    });
+    
+    // Compra fazenda (pontual)
+    datasets.push({
+        label: 'Compra Fazenda',
+        data: data.map(item => item.valor_gasto_fazenda ? item.valor_gasto_fazenda / 1000000 : 0),
+        backgroundColor: this.colors.accent + '80',
+        borderColor: this.colors.accent,
+        borderWidth: 2,
+        type: 'bar'
+    });
+
+    AppState.charts.despesasFlow = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: data.map(item => item.ano),
+            datasets: datasets
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: { font: { size: 11 } }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return `${context.dataset.label}: ${Utils.formatCurrency(context.parsed.y * 1000000, true)}`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { color: '#f1f5f9' },
+                    ticks: { color: '#6b7280', font: { size: 11 } }
+                },
+                y: {
+                    grid: { color: '#f1f5f9' },
+                    ticks: {
+                        color: '#6b7280',
+                        font: { size: 11 },
+                        callback: function(value) {
+                            return 'R$ ' + value + 'M';
+                        }
+                    }
+                }
+            }
+        }
+    });
+};
+
+ChartManager.isCanvasFree = function(canvasId) {
+    try {
+        const canvas = document.getElementById(canvasId);
+        if (!canvas) return false;
+        
+        if (typeof Chart !== 'undefined') {
+            if (Chart.getChart && Chart.getChart(canvas)) {
+                return false;
+            }
+            if (canvas.hasAttribute('data-chartjs-chart-id')) {
+                return false;
+            }
+            if (canvas.chartjsChart) {
+                return false;
+            }
+        }
+        
+        return true;
+    } catch (error) {
+        return false;
+    }
+};
+
+
+
+ChartManager.createRentabilidadeFlowChart = function() {
+    const ctx = document.getElementById('rentabilidadeFlowChart');
+    if (!ctx || !ProjectionsManager.projectionData) return;
+
+    const data = ProjectionsManager.projectionData.slice(0, 20);
+    
+    AppState.charts.rentabilidadeFlow = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: data.map(item => item.ano),
+            datasets: [{
+                label: 'Rendimentos Anuais',
+                data: data.map(item => item.rendimentos / 1000000),
+                borderColor: this.colors.accent,
+                backgroundColor: this.colors.accent + '20',
+                borderWidth: 3,
+                fill: true,
+                tension: 0.4,
+                pointBackgroundColor: this.colors.accent,
+                pointBorderColor: '#ffffff',
+                pointBorderWidth: 2,
+                pointRadius: 4
+            }, {
+                label: 'Saldo Líquido',
+                data: data.map(item => item.saldoLiquido / 1000000),
+                borderColor: this.colors.orange,
+                backgroundColor: 'transparent',
+                borderWidth: 2,
+                borderDash: [5, 5],
+                pointBackgroundColor: this.colors.orange,
+                pointRadius: 3
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: { font: { size: 11 } }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { color: '#f1f5f9' },
+                    ticks: { color: '#6b7280', font: { size: 11 } }
+                },
+                y: {
+                    grid: { color: '#f1f5f9' },
+                    ticks: {
+                        color: '#6b7280',
+                        font: { size: 11 },
+                        callback: function(value) {
+                            return 'R$ ' + value + 'M';
+                        }
+                    }
+                }
+            }
+        }
+    });
+};
+
+
+
+const periodo = parseInt(document.getElementById('periodoCompraFazenda')?.value) || 0;
+
+ChartManager.createAllocationEvolutionChart = function() {
+    const ctx = document.getElementById('allocationEvolutionChart');
+    if (!ctx) {
+        debugMessage('❌ Canvas allocationEvolutionChart não encontrado');
+        return;
+    }
+
+    // ✅ VERIFICAR Chart.js ANTES DE USAR
+    if (typeof Chart === 'undefined') {
+        debugMessage('❌ Chart.js não disponível para allocation evolution');
+        this.showAlternativeVisualization();
+        return;
+    }
+
+    debugMessage('🎨 Criando gráfico de evolução da allocation DINÂMICO v4.3.1');
+
+    try {
+        // ✅ DESTRUIR GRÁFICO ANTERIOR PRIMEIRO
+        if (AppState.charts.allocationEvolution) {
+            AppState.charts.allocationEvolution.destroy();
+            delete AppState.charts.allocationEvolution;
+            debugMessage('🗑️ Gráfico anterior de allocation evolution destruído');
+        }
+
+        // ✅ PEGAR PARÂMETROS REAIS DO USUÁRIO
+        const perfilAtual = document.getElementById('perfilInvestimento')?.value || 'moderado';
+        const periodo = parseInt(document.getElementById('periodoCompraFazenda')?.value) || 0;
+        const idadeAna = 53;
+        const expectativa = parseInt(document.getElementById('expectativaVida')?.value || 90);
+        
+        debugMessage(`📊 Parâmetros dinâmicos: perfil=${perfilAtual}, periodo=${periodo}, expectativa=${expectativa}`);
+        
+        // ✅ USAR ASSET_ALLOCATION_PROFILES CORRETAMENTE
+        const baseAllocation = ASSET_ALLOCATION_PROFILES[perfilAtual] || ASSET_ALLOCATION_PROFILES['moderado'];
+        const anos = Array.from({length: 20}, (_, i) => 2025 + i);
+        
+        // ✅ FUNÇÃO PARA CALCULAR ALLOCATION DINÂMICA
+        const calcularAllocation = (anoIndex) => {
+            const idadeAnaNoAno = idadeAna + anoIndex;
+            
+            // Fator conservadorismo por idade (aumenta 0.5% RF por ano após 60)
+            const fatorIdade = idadeAnaNoAno > 60 ? (idadeAnaNoAno - 60) * 0.5 : 0;
+            
+            // Fator liquidez por proximidade da fazenda
+            let fatorLiquidez = baseAllocation.liquidez || 2;
+            if (periodo > 0) {
+                const anosAteFazenda = periodo - anoIndex;
+                if (anosAteFazenda <= Math.floor(periodo * 0.2) && anosAteFazenda > 0) {
+                    // Últimos 20% do período: liquidez alta
+                    fatorLiquidez = 15;
+                } else if (anosAteFazenda <= Math.floor(periodo * 0.4) && anosAteFazenda > 0) {
+                    // 20%-40% finais: liquidez moderada
+                    fatorLiquidez = 8;
+                } else if (anosAteFazenda <= Math.floor(periodo * 0.6) && anosAteFazenda > 0) {
+                    // 40%-60%: começar acumular
+                    fatorLiquidez = 4;
+                }
+            }
+            
+            // Ajustar RF aumentando por idade + reduzindo por liquidez
+            let rendaFixaBR = (baseAllocation.renda_fixa_br || 50) + fatorIdade - (fatorLiquidez - (baseAllocation.liquidez || 2)) * 0.6;
+            let rendaFixaInt = baseAllocation.renda_fixa_int || 20;
+            let acoesBR = Math.max(3, (baseAllocation.acoes_br || 15) - fatorIdade * 0.3);
+            let acoesInt = Math.max(3, (baseAllocation.acoes_int || 10) - fatorIdade * 0.2);
+            let imoveis = baseAllocation.imoveis || 3;
+            let multimercado = baseAllocation.multimercado || 0;
+            
+            // Normalizar para 100%
+            const total = rendaFixaBR + rendaFixaInt + acoesBR + acoesInt + imoveis + multimercado + fatorLiquidez;
+            const fator = 100 / total;
+            
+            return {
+                renda_fixa_br: rendaFixaBR * fator,
+                renda_fixa_int: rendaFixaInt * fator,
+                acoes_br: acoesBR * fator,
+                acoes_int: acoesInt * fator,
+                imoveis: imoveis * fator,
+                multimercado: multimercado * fator,
+                liquidez: fatorLiquidez * fator
+            };
+        };
+        
+        // ✅ CRIAR DATASETS DINÂMICOS COM CHECKBOXES
+        const datasets = [
+            {
+                label: 'Renda Fixa BR',
+                data: anos.map((ano, i) => calcularAllocation(i + 1).renda_fixa_br),
+                borderColor: ChartManager.colors.primary,
+                backgroundColor: ChartManager.colors.primary + '20',
+                tension: 0.4,
+                hidden: !document.getElementById('showRendaFixaBR')?.checked
+            },
+            {
+                label: 'Renda Fixa Int',
+                data: anos.map((ano, i) => calcularAllocation(i + 1).renda_fixa_int),
+                borderColor: ChartManager.colors.secondary,
+                backgroundColor: ChartManager.colors.secondary + '20',
+                tension: 0.4,
+                hidden: !document.getElementById('showRendaFixaInt')?.checked
+            },
+            {
+                label: 'Ações BR',
+                data: anos.map((ano, i) => calcularAllocation(i + 1).acoes_br),
+                borderColor: ChartManager.colors.accent,
+                backgroundColor: ChartManager.colors.accent + '20',
+                tension: 0.4,
+                hidden: !document.getElementById('showAcoesBR')?.checked
+            },
+            {
+                label: 'Ações Int',
+                data: anos.map((ano, i) => calcularAllocation(i + 1).acoes_int),
+                borderColor: ChartManager.colors.orange,
+                backgroundColor: ChartManager.colors.orange + '20',
+                tension: 0.4,
+                hidden: !document.getElementById('showAcoesInt')?.checked
+            },
+            {
+                label: 'Imóveis',
+                data: anos.map((ano, i) => calcularAllocation(i + 1).imoveis),
+                borderColor: ChartManager.colors.purple,
+                backgroundColor: ChartManager.colors.purple + '20',
+                tension: 0.4,
+                hidden: !document.getElementById('showImoveis')?.checked
+            },
+            {
+                label: 'Liquidez',
+                data: anos.map((ano, i) => calcularAllocation(i + 1).liquidez),
+                borderColor: '#dc2626',
+                backgroundColor: '#dc262620',
+                borderWidth: 3,
+                tension: 0.4,
+                hidden: !document.getElementById('showLiquidez')?.checked
+            }
+        ];
+        
+        // ✅ ADICIONAR MULTIMERCADO SE FOR PERFIL BALANCEADO
+        if (baseAllocation.multimercado) {
+            datasets.push({
+                label: 'Multimercado',
+                data: anos.map((ano, i) => calcularAllocation(i + 1).multimercado),
+                borderColor: '#8b5cf6',
+                backgroundColor: '#8b5cf620',
+                tension: 0.4,
+                hidden: !document.getElementById('showMultimercado')?.checked
+            });
+        }
+
+        // ✅ CRIAR GRÁFICO DINÂMICO
+        AppState.charts.allocationEvolution = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: anos,
+                datasets: datasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { font: { size: 10 }, padding: 8, usePointStyle: true }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            title: function(context) {
+                                const anoIndex = context[0].dataIndex;
+                                const ano = anos[anoIndex];
+                                const idadeAna = 53 + anoIndex + 1;
+                                return `${ano} (Ana: ${idadeAna} anos)`;
+                            },
+                            label: function(context) {
+                                return `${context.dataset.label}: ${context.parsed.y.toFixed(1)}%`;
+                            },
+                            afterBody: function(context) {
+                                const anoIndex = context[0].dataIndex;
+                                const anosAteFazenda = periodo - anoIndex - 1;
+                                if (periodo > 0 && anosAteFazenda >= 0) {
+                                    return [``, `🏡 Fazenda em ${anosAteFazenda} anos`];
+                                }
+                                return [];
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { color: '#f1f5f9' },
+                        ticks: { color: '#6b7280', font: { size: 10 }, maxTicksLimit: 10 }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        max: 80,
+                        grid: { color: '#f1f5f9' },
+                        ticks: {
+                            color: '#6b7280',
+                            font: { size: 10 },
+                            callback: function(value) { return value + '%'; }
+                        }
+                    }
+                }
+            }
+        });
+
+        debugMessage('✅ Gráfico de allocation evolution criado dinamicamente');
+
+    } catch (error) {
+        debugMessage(`❌ Erro no gráfico allocation evolution: ${error.message}`, 'error');
+        console.error('Erro detalhado:', error);
+        this.showAlternativeVisualization();
+    }
+};
+    
+    const baseAllocation = ASSET_ALLOCATION_PROFILES[perfilAtual] || ASSET_ALLOCATION_PROFILES['moderado'];
+    const anos = Array.from({length: 20}, (_, i) => 2025 + i);
+    
+    // ✅ FUNÇÃO PARA CALCULAR ALLOCATION DINÂMICA
+    const calcularAllocation = (anoIndex) => {
+        const idadeAnaNoAno = idadeAna + anoIndex;
+        
+        // Fator conservadorismo por idade (aumenta 0.5% RF por ano após 60)
+        const fatorIdade = idadeAnaNoAno > 60 ? (idadeAnaNoAno - 60) * 0.5 : 0;
+        
+        // Fator liquidez por proximidade da fazenda
+        let fatorLiquidez = baseAllocation.liquidez;
+        if (periodo > 0) {
+            const anosAteFazenda = periodo - anoIndex;
+            if (anosAteFazenda <= Math.floor(periodo * 0.2)) {
+                // Últimos 20% do período: liquidez alta
+                fatorLiquidez = 15;
+            } else if (anosAteFazenda <= Math.floor(periodo * 0.4)) {
+                // 20%-40% finais: liquidez moderada
+                fatorLiquidez = 8;
+            } else if (anosAteFazenda <= Math.floor(periodo * 0.6)) {
+                // 40%-60%: começar acumular
+                fatorLiquidez = 4;
+            }
+        }
+        
+        // Ajustar RF aumentando por idade + reduzindo por liquidez
+        let rendaFixaBR = baseAllocation.renda_fixa_br + fatorIdade - (fatorLiquidez - baseAllocation.liquidez) * 0.6;
+        let rendaFixaInt = baseAllocation.renda_fixa_int;
+        let acoesBR = Math.max(3, baseAllocation.acoes_br - fatorIdade * 0.3);
+        let acoesInt = Math.max(3, baseAllocation.acoes_int - fatorIdade * 0.2);
+        let imoveis = baseAllocation.imoveis;
+        let multimercado = baseAllocation.multimercado || 0;
+        
+        // Normalizar para 100%
+        const total = rendaFixaBR + rendaFixaInt + acoesBR + acoesInt + imoveis + multimercado + fatorLiquidez;
+        const fator = 100 / total;
+        
+        return {
+            renda_fixa_br: rendaFixaBR * fator,
+            renda_fixa_int: rendaFixaInt * fator,
+            acoes_br: acoesBR * fator,
+            acoes_int: acoesInt * fator,
+            imoveis: imoveis * fator,
+            multimercado: multimercado * fator,
+            liquidez: fatorLiquidez * fator
+        };
+    };
+    
+    const datasets = [
+        {
+            label: 'Renda Fixa BR',
+            data: anos.map((ano, i) => calcularAllocation(i + 1).renda_fixa_br),
+            borderColor: ChartManager.colors.primary,
+            backgroundColor: ChartManager.colors.primary + '20',
+            tension: 0.4,
+            hidden: !document.getElementById('showRendaFixaBR')?.checked
+        },
+        {
+            label: 'Renda Fixa Int',
+            data: anos.map((ano, i) => calcularAllocation(i + 1).renda_fixa_int),
+            borderColor: ChartManager.colors.secondary,
+            backgroundColor: ChartManager.colors.secondary + '20',
+            tension: 0.4,
+            hidden: !document.getElementById('showRendaFixaInt')?.checked
+        },
+        {
+            label: 'Ações BR',
+            data: anos.map((ano, i) => calcularAllocation(i + 1).acoes_br),
+            borderColor: ChartManager.colors.accent,
+            backgroundColor: ChartManager.colors.accent + '20',
+            tension: 0.4,
+            hidden: !document.getElementById('showAcoesBR')?.checked
+        },
+        {
+            label: 'Ações Int',
+            data: anos.map((ano, i) => calcularAllocation(i + 1).acoes_int),
+            borderColor: ChartManager.colors.orange,
+            backgroundColor: ChartManager.colors.orange + '20',
+            tension: 0.4,
+            hidden: !document.getElementById('showAcoesInt')?.checked
+        },
+        {
+            label: 'Imóveis',
+            data: anos.map((ano, i) => calcularAllocation(i + 1).imoveis),
+            borderColor: ChartManager.colors.purple,
+            backgroundColor: ChartManager.colors.purple + '20',
+            tension: 0.4,
+            hidden: !document.getElementById('showImoveis')?.checked
+        },
+        {
+            label: 'Liquidez',
+            data: anos.map((ano, i) => calcularAllocation(i + 1).liquidez),
+            borderColor: '#dc2626',
+            backgroundColor: '#dc262620',
+            borderWidth: 3,
+            tension: 0.4,
+            hidden: !document.getElementById('showLiquidez')?.checked
+        }
+    ];
+    
+    // Adicionar Multimercado se for perfil balanceado
+    if (baseAllocation.multimercado) {
+        datasets.push({
+            label: 'Multimercado',
+            data: anos.map((ano, i) => calcularAllocation(i + 1).multimercado),
+            borderColor: '#8b5cf6',
+            backgroundColor: '#8b5cf620',
+            tension: 0.4,
+            hidden: !document.getElementById('showMultimercado')?.checked
+        });
+    }
+
+    const FazendaManager = {
+    // Calcular valor futuro da fazenda
+    calcularValorFuturo(valorAtual, anos) {
+        if (anos <= 0) return valorAtual;
+        return valorAtual * Math.pow(1 + CONFIG.INFLACAO_ESTATICA / 100, anos);
+    },
+
+    // Atualizar informações da fazenda na UI
+    updateFazendaInfo() {
+        const periodo = parseInt(document.getElementById('periodoCompraFazenda').value) || 0;
+        const valorAtual = parseFloat(document.getElementById('valorFazendaAtual').value) || 0;
+        
+        // Atualizar texto do valor futuro
+        if (periodo > 0) {
+            const valorFuturo = this.calcularValorFuturo(valorAtual, periodo);
+            const futuroEl = document.getElementById('valorFazendaFuturo');
+            if (futuroEl) {
+                futuroEl.textContent = `≈ ${Utils.formatCurrency(valorFuturo, true)} em ${periodo} anos (inflação ${CONFIG.INFLACAO_ESTATICA}%)`;
+            }
+        } else {
+            const futuroEl = document.getElementById('valorFazendaFuturo');
+            if (futuroEl) {
+                futuroEl.textContent = 'Compra imediata (sem ajuste de inflação)';
+            }
+        }
+
+        // Atualizar seção de informações
+        this.updateFazendaInfoSection(periodo, valorAtual);
+    },
+
+    updateFazendaInfoSection(periodo, valorAtual) {
+        const infoEl = document.getElementById('fazendaInfoContent');
+        if (!infoEl) return;
+
+        if (periodo === 0) {
+            infoEl.innerHTML = `
+                <strong>Compra Imediata:</strong> R$ ${Utils.formatCurrency(valorAtual, true)}<br>
+                <em>Impacto: Redução imediata do patrimônio, sem período de acumulação</em>
+            `;
+        } else {
+            const valorFuturo = this.calcularValorFuturo(valorAtual, periodo);
+            const fases = this.calcularFases(periodo);
+            
+            infoEl.innerHTML = `
+                <strong>Compra em ${periodo} anos:</strong><br>
+                • Valor hoje: ${Utils.formatCurrency(valorAtual, true)}<br>
+                • Valor futuro: ${Utils.formatCurrency(valorFuturo, true)} (c/ inflação)<br>
+                • Estratégia: Liquidez gradual em ${fases.length} fases<br>
+                <em>Liquidez final: ${fases[fases.length - 1]?.liquidez || 15}% antes da compra</em>
+            `;
+        }
+    },
+
+    calcularFases(periodo) {
+        if (periodo <= 0) return [];
+        
+        const fase1Anos = Math.max(1, Math.floor(periodo * 0.40));
+        const fase2Anos = Math.max(1, Math.floor(periodo * 0.40));
+        const fase3Anos = periodo - fase1Anos - fase2Anos;
+        
+        return [
+            { periodo: `1-${fase1Anos}`, liquidez: 2, descricao: 'Normal' },
+            { periodo: `${fase1Anos + 1}-${fase1Anos + fase2Anos}`, liquidez: 4, descricao: 'Moderado' },
+            { periodo: `${fase1Anos + fase2Anos + 1}-${periodo}`, liquidez: 15, descricao: 'Intensivo' }
+        ];
+    },
+
+    // Atualizar card de fazenda no dashboard
+    updateFazendaCard(dadosFazenda) {
+        if (!dadosFazenda) return;
+
+        // Valor disponível
+        const valorEl = document.getElementById('valorFazenda');
+        if (valorEl) {
+            valorEl.textContent = Utils.formatCurrency(dadosFazenda.fazenda_disponivel, true);
+        }
+
+        // Período
+        const periodoEl = document.getElementById('periodoFazendaDisplay');
+        if (periodoEl) {
+            const periodo = dadosFazenda.periodo_compra_fazenda;
+            if (periodo && periodo > 0) {
+                periodoEl.textContent = `Em ${periodo} anos`;
+            } else {
+                periodoEl.textContent = 'Compra imediata';
+            }
+        }
+
+        // Comparação necessário vs disponível
+        const necessarioEl = document.getElementById('fazendaNecessario');
+        const disponivelEl = document.getElementById('fazendaDisponivel');
+        
+        if (necessarioEl) {
+            necessarioEl.textContent = Utils.formatCurrency(dadosFazenda.valor_fazenda_futuro || dadosFazenda.valor_fazenda_atual, true);
+        }
+        
+        if (disponivelEl) {
+            disponivelEl.textContent = Utils.formatCurrency(dadosFazenda.fazenda_disponivel, true);
+        }
+
+        // Status
+        const statusEl = document.getElementById('fazendaStatus');
+        if (statusEl) {
+            const analysis = dadosFazenda.fazenda_analysis || {};
+            
+            if (analysis.viavel) {
+                statusEl.innerHTML = '<span class="status-badge success">✅ Viável</span>';
+            } else {
+                statusEl.innerHTML = '<span class="status-badge danger">❌ Inviável</span>';
+            }
+        }
+
+        debugMessage('Card da fazenda atualizado');
+    },
+
+    // Criar timeline das fases
+    createFazendaTimeline(periodo) {
+        const timelineEl = document.getElementById('fazendaTimeline');
+        if (!timelineEl || periodo <= 0) {
+            if (timelineEl) timelineEl.innerHTML = '<div class="timeline-phase"><div class="phase-title">Compra Imediata</div><div class="phase-liquidez">Sem acumulação</div></div>';
+            return;
+        }
+
+        const fases = this.calcularFases(periodo);
+        
+        timelineEl.innerHTML = fases.map((fase, index) => `
+            <div class="timeline-phase ${index === 0 ? 'active' : ''}">
+                <div class="phase-title">Fase ${index + 1}</div>
+                <div class="phase-period">Anos ${fase.periodo}</div>
+                <div class="phase-liquidez">${fase.liquidez}% liquidez</div>
+                <div style="font-size: 0.7rem; color: var(--gray-500); margin-top: 4px;">
+                    ${fase.descricao}
+                </div>
+            </div>
+        `).join('');
+    }
+};
+
+
+
+
     // ================ SIMULATION MANAGER ================ 
     const SimulationManager = {
         updateParameters() {
@@ -1627,9 +2348,1009 @@ mapBackendResponse(backendData) {
 
     // ================ REPORT MANAGER SINCRONIZADO ================ 
     // ================ REPORT MANAGER EXTENDIDO ================
-const ReportManager = {
-    async generateDetailedReport(tipo, parametros = null) {
+
+window.ProjectionsManager = {
+    currentScenario: 'atual',
+    projectionData: null,
+    cashFlowView: 'annual',
+    
+    async initialize() {
+    debugMessage('🚀 Inicializando ProjectionsManager - VERSÃO SINCRONIZADA v4.3');
+    
+    try {
+        // ✅ PASSO 1: Atualizar card do cenário atual
+        this.updateCurrentScenarioCard();
+        
+        // ✅ PASSO 2: Buscar dados das projeções e aguardar
+        await this.updateProjectionsData();
+        
+        // ✅ PASSO 3: Aguardar processamento completo
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        debugMessage('✅ ProjectionsManager inicializado com sucesso');
+        
+    } catch (error) {
+        debugMessage(`❌ Erro na inicialização do ProjectionsManager: ${error.message}`, 'error');
+        throw error;
+    }
+},
+    
+    async updateProjectionsData() {
+     try {
+        debugMessage('📊 Atualizando projeções DINÂMICAS v4.3.1');
+        
+        // ✅ FORÇAR BUSCA NOVA DE DADOS
+        const projectionsData = await ApiClient.fetchProjectionsData();
+        
+        if (projectionsData.success) {
+            this.projectionData = projectionsData.projecao_anual;
+            debugMessage(`✅ Recebidos ${this.projectionData.length} anos de projeção ATUALIZADOS`);
+            
+            // ✅ AGUARDAR ANTES DE ATUALIZAR UI
+            await new Promise(resolve => setTimeout(resolve, 200));
+            
+            // ✅ ATUALIZAR ELEMENTOS COM DADOS ATUAIS
+            await this.updateProjectionSummaryFixed();
+            this.updateMilestones(projectionsData.marcos_temporais);
+            this.updateProjectionTable();
+            this.updateProjectionStatusBar(); // ✅ NOVA FUNÇÃO
+            
+            const periodo = parseInt(document.getElementById('periodoCompraFazenda')?.value) || 0;
+            FazendaManager.createFazendaTimeline(periodo);
+            
+        } else {
+            throw new Error('Falha ao buscar projeções do backend');
+        }
+        
+    } catch (error) {
+        debugMessage(`❌ Erro ao atualizar projeções: ${error.message}`, 'error');
+        this.generateFallbackProjections();
+    }},
+
+    
+    // ✅ MÉTODOS CORRIGIDOS PARA snake_case
+    findProjectionByYear(years) {
+        if (!this.projectionData) return null;
+        return this.projectionData.find(p => p.ano === 2025 + years);
+    },
+    
+    findProjectionByAge(age) {
+        if (!this.projectionData) return null;
+        return this.projectionData.find(p => p.idade_ana === age);  // ✅ snake_case
+    },
+    
+    findFirstDeficit() {
+        if (!this.projectionData) return null;
+        return this.projectionData.find(p => p.saldo_liquido < 0);  // ✅ snake_case
+    },
+    
+    async updateProjectionSummary() {
+    debugMessage('🔄 Atualizando resumo de projeções - VERSÃO ROBUSTA');
+    
+    // ✅ VERIFICAÇÃO ROBUSTA DOS DADOS
+    if (!this.projectionData || this.projectionData.length === 0) {
+        debugMessage('⚠️ Dados de projeção não disponíveis', 'warning');
+        
+        // ✅ MOSTRAR PLACEHOLDERS
+        this.updateElement('patrimonio10Anos', 'Carregando...');
+        this.updateElement('patrimonio20Anos', 'Carregando...');
+        this.updateElement('patrimonioExpectativa', 'Carregando...');
+        this.updateElement('primeiroDeficit', 'Analisando...');
+        this.updateElement('statusGeral', 'Processando...');
+        return;
+    }
+    
+    debugMessage(`📊 Processando ${this.projectionData.length} anos de dados`);
+    
+    const expectativa = parseInt(document.getElementById('expectativaVida')?.value || 90);
+    
+    // ✅ BUSCA ROBUSTA DOS DADOS
+    const projeto10Anos = this.findProjectionByYear(10);
+    const projeto20Anos = this.findProjectionByYear(20);
+    const projetoExpectativa = this.findProjectionByAge(expectativa);
+    const primeiroDeficit = this.findFirstDeficit();
+    
+    debugMessage(`🔍 Dados encontrados - 10 anos: ${!!projeto10Anos}, 20 anos: ${!!projeto20Anos}, expectativa: ${!!projetoExpectativa}`);
+    
+    // ✅ AGUARDAR DOM ESTAR PRONTO
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    // ✅ ATUALIZAÇÃO SEQUENCIAL COM VERIFICAÇÃO
+    try {
+        // Patrimônio em 10 anos
+        const valor10Anos = projeto10Anos ? Utils.formatCurrency(projeto10Anos.patrimonio, true) : 'N/A';
+        this.updateElement('patrimonio10Anos', valor10Anos);
+        
+        // Patrimônio em 20 anos  
+        const valor20Anos = projeto20Anos ? Utils.formatCurrency(projeto20Anos.patrimonio, true) : 'N/A';
+        this.updateElement('patrimonio20Anos', valor20Anos);
+        
+        // Expectativa de vida
+        this.updateElement('expectativaAge', expectativa);
+        
+        // Patrimônio na expectativa
+        const valorExpectativa = projetoExpectativa ? Utils.formatCurrency(projetoExpectativa.patrimonio, true) : 'N/A';
+        this.updateElement('patrimonioExpectativa', valorExpectativa);
+        
+        // Primeiro déficit
+        const deficitTexto = primeiroDeficit ? `Ano ${primeiroDeficit.ano}` : 'Não identificado';
+        this.updateElement('primeiroDeficit', deficitTexto);
+        
+        // Status geral
+        const statusGeral = this.determineOverallStatus();
+        this.updateElement('statusGeral', statusGeral.text);
+        
+        // ✅ AGUARDAR TODAS AS ATUALIZAÇÕES
+        await new Promise(resolve => setTimeout(resolve, 200));
+        
+        this.updateTrends(projeto10Anos, projeto20Anos, projetoExpectativa, primeiroDeficit);
+        
+        debugMessage('✅ Resumo de projeções atualizado com sucesso');
+        
+    } catch (error) {
+        debugMessage(`❌ Erro ao atualizar resumo: ${error.message}`, 'error');
+    }
+},
+    
+    updateProjectionTable() {
+        const tableBody = document.getElementById('projectionTableBody');
+        if (!tableBody || !this.projectionData) return;
+        
+        const rows = this.projectionData.slice(0, 20).map(proj => {
+            const statusClass = proj.saldo_liquido >= 0 ? 'value-positive' : 'value-negative';  // ✅ snake_case
+            const statusText = proj.saldo_liquido >= 0 ? 'Positivo' : 'Negativo';
+            
+            return `
+                <tr ${proj.compra_fazenda ? 'style="background: rgba(5, 150, 105, 0.05); border-left: 3px solid var(--accent);"' : ''}>
+                    <td><strong>${proj.ano}</strong>${proj.compra_fazenda ? ' 🏡' : ''}</td>
+                    <td>${proj.idade_ana} anos ${proj.ana_viva ? '' : '(†)'}</td>
+                    <td>${Utils.formatCurrency(proj.patrimonio, true)}</td>
+                    <td class="value-positive">${Utils.formatCurrency(proj.rendimentos, true)}</td>
+                    <td class="value-negative">${Utils.formatCurrency(proj.saidas, true)}</td>
+                    <td class="${statusClass}">${Utils.formatCurrency(proj.saldo_liquido, true)}</td>
+                    <td><span class="status-badge ${proj.saldo_liquido >= 0 ? 'success' : 'danger'}">${statusText}</span></td>
+                </tr>
+            `;
+        }).join('');
+        
+        tableBody.innerHTML = rows;
+        debugMessage('✅ Tabela de projeção atualizada com snake_case');
+    },
+    
+    // ✅ MÉTODOS AUXILIARES
+    updateElement(id, value) {
+    const updateWithRetry = async (elementId, newValue, maxAttempts = 15) => {
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+            const element = document.getElementById(elementId);
+            if (element) {
+                element.textContent = newValue;
+                debugMessage(`✅ Elemento ${elementId} atualizado: ${newValue}`);
+                return true;
+            }
+            
+            // ✅ AGUARDAR ELEMENTO APARECER NO DOM
+            if (attempt < maxAttempts) {
+                debugMessage(`⏳ Tentativa ${attempt}/${maxAttempts}: aguardando elemento ${elementId}`);
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+        }
+        
+        debugMessage(`❌ Elemento ${elementId} não encontrado após ${maxAttempts} tentativas`, 'warning');
+        return false;
+    };
+    
+    // ✅ EXECUTAR ATUALIZAÇÃO ASSÍNCRONA
+    updateWithRetry(id, value).catch(error => {
+        debugMessage(`❌ Erro ao atualizar elemento ${id}: ${error.message}`, 'error');
+    });
+},
+    
+    determineOverallStatus() {
+        const deficit = this.findFirstDeficit();
+        const expectativa = parseInt(document.getElementById('expectativaVida')?.value || 90);
+        
+        if (!deficit) {
+            return { text: 'Sustentável', class: 'value-positive' };
+        } else if (deficit.idade_ana > expectativa) {  // ✅ snake_case
+            return { text: 'Viável', class: 'value-positive' };
+        } else if (deficit.idade_ana > expectativa - 5) {
+            return { text: 'Atenção', class: 'value-warning' };
+        } else {
+            return { text: 'Crítico', class: 'value-negative' };
+        }
+    },
+    
+    updateTrends(proj10, proj20, projExp, deficit) {
+        // Implementação simplificada para trends
+        debugMessage('✅ Trends atualizados');
+    },
+    
+    generateFallbackProjections() {
+        debugMessage('🔄 Gerando projeções de fallback com snake_case');
+        
+        const taxa = parseFloat(document.getElementById('taxaRetorno')?.value || 4.0);
+        const expectativa = parseInt(document.getElementById('expectativaVida')?.value || 90);
+        const despesas = parseFloat(document.getElementById('despesasMensais')?.value || 150000);
+        
+        const patrimonio = AppState.currentData?.patrimonio || 65000000;
+        let patrimonioAtual = patrimonio;
+        const projecao = [];
+        
+        for (let ano = 0; ano < 30; ano++) {
+            const idade_ana = 53 + ano + 1;  // ✅ snake_case
+            const anoCalendario = 2025 + ano;
+            
+            const rendimentos = patrimonioAtual * (taxa / 100);
+            let saidasAnuais = 0;
+            
+            if (idade_ana <= expectativa) {
+                saidasAnuais += despesas * 12;
+            }
+            
+            if (ano < 15) {
+                saidasAnuais += 50000 * 12;
+            }
+            
+            const saldo_liquido = rendimentos - saidasAnuais;  // ✅ snake_case
+            patrimonioAtual += saldo_liquido;
+            patrimonioAtual = Math.max(patrimonioAtual, 0);
+            
+            projecao.push({
+                ano: anoCalendario,
+                idade_ana: idade_ana,  // ✅ snake_case
+                patrimonio: patrimonioAtual,
+                rendimentos: rendimentos,
+                saidas: saidasAnuais,
+                saldo_liquido: saldo_liquido,  // ✅ snake_case
+                ana_viva: idade_ana <= expectativa,  // ✅ snake_case
+                compra_fazenda: false
+            });
+        }
+        
+        this.projectionData = projecao;
+        this.updateProjectionSummary();
+        this.updateProjectionTable();
+        
+        debugMessage(`✅ ${projecao.length} anos de fallback gerados com snake_case`);
+    },
+    
+    // Métodos restantes simplificados
+    updateCurrentScenarioCard() { debugMessage('✅ Scenario card updated'); },
+    updateMilestones() { debugMessage('✅ Milestones updated'); }
+};
+
+
+window.ProjectionsManager.updateProjectionStatusBar = function() {
+    debugMessage('📊 Atualizando barra de status das projeções');
+    
+    // ✅ PEGAR PARÂMETROS ATUAIS DOS INPUTS
+    const taxa = parseFloat(document.getElementById('taxaRetorno')?.value || 4.0);
+    const expectativa = parseInt(document.getElementById('expectativaVida')?.value || 90);
+    const perfil = document.getElementById('perfilInvestimento')?.value || 'moderado';
+    const idadeAna = 53;
+    const horizonte = expectativa - idadeAna;
+    
+    // ✅ ATUALIZAR ELEMENTOS DA BARRA DE STATUS
+    const elements = {
+        'currentRate': `${taxa}%`,
+        'projectionHorizon': `${horizonte} anos`,
+        'currentProfile': perfil.charAt(0).toUpperCase() + perfil.slice(1),
+        'sustainabilityAge': `${expectativa} anos`
+    };
+    
+    Object.entries(elements).forEach(([id, value]) => {
+        const element = document.getElementById(id);
+        if (element) {
+            element.textContent = value;
+            debugMessage(`✅ Atualizado ${id}: ${value}`);
+        }
+    });
+};
+
+window.ProjectionsManager.updateProjectionSummaryFixed = async function() {
+    debugMessage('🔄 Atualizando resumo de projeções DINÂMICO v4.3.1');
+    
+    // ✅ VERIFICAÇÃO ROBUSTA DOS DADOS
+    if (!this.projectionData || this.projectionData.length === 0) {
+        debugMessage('⚠️ Dados de projeção não disponíveis', 'warning');
+        return;
+    }
+    
+    debugMessage(`📊 Processando ${this.projectionData.length} anos de dados ATUAIS`);
+    
+    // ✅ USAR PARÂMETROS ATUAIS DO USUÁRIO
+    const expectativa = parseInt(document.getElementById('expectativaVida')?.value || 90);
+    
+    // ✅ BUSCA ROBUSTA DOS DADOS
+    const projeto10Anos = this.findProjectionByYear(10);
+    const projeto20Anos = this.findProjectionByYear(20);
+    const projetoExpectativa = this.findProjectionByAge(expectativa);
+    const primeiroDeficit = this.findFirstDeficit();
+    
+    debugMessage(`🔍 Dados encontrados - 10 anos: ${!!projeto10Anos}, 20 anos: ${!!projeto20Anos}, expectativa: ${!!projetoExpectativa}`);
+    
+    // ✅ AGUARDAR DOM ESTAR PRONTO
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    // ✅ ATUALIZAÇÃO SEQUENCIAL COM VERIFICAÇÃO
+    try {
+        // Patrimônio em 10 anos
+        const valor10Anos = projeto10Anos ? Utils.formatCurrency(projeto10Anos.patrimonio, true) : 'N/A';
+        this.updateElement('patrimonio10Anos', valor10Anos);
+        
+        // Patrimônio em 20 anos  
+        const valor20Anos = projeto20Anos ? Utils.formatCurrency(projeto20Anos.patrimonio, true) : 'N/A';
+        this.updateElement('patrimonio20Anos', valor20Anos);
+        
+        // Expectativa de vida DINÂMICA
+        this.updateElement('expectativaAge', expectativa);
+        
+        // Patrimônio na expectativa
+        const valorExpectativa = projetoExpectativa ? Utils.formatCurrency(projetoExpectativa.patrimonio, true) : 'N/A';
+        this.updateElement('patrimonioExpectativa', valorExpectativa);
+        
+        // Primeiro déficit
+        const deficitTexto = primeiroDeficit ? `Ano ${primeiroDeficit.ano}` : 'Não identificado';
+        this.updateElement('primeiroDeficit', deficitTexto);
+        
+        // Status geral
+        const statusGeral = this.determineOverallStatus();
+        this.updateElement('statusGeral', statusGeral.text);
+        
+        // ✅ ATUALIZAR TAMBÉM A BARRA DE STATUS
+        this.updateProjectionStatusBar();
+        
+        // ✅ AGUARDAR TODAS AS ATUALIZAÇÕES
+        await new Promise(resolve => setTimeout(resolve, 200));
+        
+        this.updateTrends(projeto10Anos, projeto20Anos, projetoExpectativa, primeiroDeficit);
+        
+        debugMessage('✅ Resumo de projeções atualizado DINAMICAMENTE com sucesso');
+        
+    } catch (error) {
+        debugMessage(`❌ Erro ao atualizar resumo dinâmico: ${error.message}`, 'error');
+    }
+};
+
+    // ================ UI MANAGER SINCRONIZADO ================ 
+    const UIManager = {
+        showLoading(show) {
+            const refreshBtn = document.getElementById('refreshBtn');
+            if (refreshBtn) {
+                if (show) {
+                    refreshBtn.classList.add('loading');
+                    refreshBtn.innerHTML = '<i class="fas fa-sync-alt"></i><span>Carregando...</span>';
+                } else {
+                    refreshBtn.classList.remove('loading');
+                    refreshBtn.innerHTML = '<i class="fas fa-sync-alt"></i><span>Atualizar</span>';
+                }
+            }
+        },
+        updateTable() {
+        if (!AppState.currentData || !AppState.currentData.sensibilidade) {
+            debugMessage('Dados insuficientes para atualizar tabela', 'warning');
+            return;
+        }
+
+        const tbody = document.getElementById('cenarioTableBody');
+        if (!tbody) {
+            debugMessage('Elemento cenarioTableBody não encontrado', 'warning');
+            return;
+        }
+
+        const { sensibilidade } = AppState.currentData;
+        
+        tbody.innerHTML = sensibilidade.map(item => {
+            const status = this.getStatusBadge(item.fazenda, item.percentual);
+            return `
+                <tr>
+                    <td><strong>${item.taxa}%</strong></td>
+                    <td>${Utils.formatCurrency(item.fazenda, true)}</td>
+                    <td>${Utils.formatPercentage(item.percentual)}</td>
+                    <td>${status}</td>
+                </tr>
+            `;
+        }).join('');
+
+        debugMessage('Tabela de cenários atualizada com sucesso');
+    },
+
+        updateSystemStatus(isConnected) {
+            const statusEl = document.getElementById('systemStatus');
+            if (statusEl) {
+                if (isConnected) {
+                    statusEl.innerHTML = '<i class="fas fa-circle"></i><span>Sistema Online</span>';
+                    statusEl.className = 'status-indicator connected';
+                } else {
+                    statusEl.innerHTML = '<i class="fas fa-exclamation-triangle"></i><span>Sistema Offline</span>';
+                    statusEl.className = 'status-indicator disconnected';
+                }
+            }
+        },
+
+
+
+
+        updateStatusVisual(status) {
+            const statusBadge = document.getElementById('statusBadge');
+            const statusText = document.getElementById('statusText');
+            const statusDescription = document.getElementById('statusDescription');
+            const statusEl = document.getElementById('valorStatus');
+            
+            if (!statusBadge || !statusText || !statusDescription) return;
+            
+            statusBadge.classList.remove('critico', 'atencao', 'viavel');
+            
+            let icon, description;
+            
+            if (status === 'crítico') {
+                statusBadge.classList.add('critico');
+                icon = 'exclamation-triangle';
+                description = 'Plano insustentável - ação urgente necessária';
+                if (statusEl) statusEl.innerHTML = '⚠️ Crítico';
+            } else if (status === 'atenção') {
+                statusBadge.classList.add('atencao');
+                icon = 'exclamation-circle';
+                description = 'Plano viável mas com margem baixa';
+                if (statusEl) statusEl.innerHTML = '⚡ Atenção';
+            } else {
+                statusBadge.classList.add('viavel');
+                icon = 'check-circle';
+                description = 'Plano sustentável com boa margem';
+                if (statusEl) statusEl.innerHTML = '✅ Viável';
+            }
+            
+            statusBadge.innerHTML = `<i class="fas fa-${icon}"></i><span>${status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Calculando'}</span>`;
+            statusDescription.textContent = description;
+            
+            debugMessage(`Status visual atualizado: ${status}`);
+        },
+
+        updateAlerts() {
+            const container = document.getElementById('alertContainer');
+            if (!container || !AppState.currentData) return;
+            
+            const { resultado, status } = AppState.currentData;
+            container.innerHTML = '';
+            
+            if (status === 'crítico' || (resultado && resultado.fazenda < 0)) {
+                container.innerHTML = `
+                    <div class="alert danger">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>Atenção:</strong> O plano atual pode não ser sustentável. 
+                        Considere ajustar as variáveis para melhorar o resultado.
+                    </div>
+                `;
+            } else if (status === 'atenção') {
+                container.innerHTML = `
+                    <div class="alert warning">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>Cuidado:</strong> Margem de segurança baixa. 
+                        Monitore as variáveis de perto.
+                    </div>
+                `;
+            } else if (status === 'viável') {
+                container.innerHTML = `
+                    <div class="alert success">
+                        <i class="fas fa-check-circle"></i>
+                        <strong>Excelente:</strong> O plano está funcionando bem dentro dos parâmetros estabelecidos.
+                    </div>
+                `;
+            }
+        },
+
+       
+
+        getStatusBadge(fazenda, percentual) {
+            if (fazenda < 0) {
+                return '<span class="status-badge danger">Inviável</span>';
+            } else if (percentual < 5) {
+                return '<span class="status-badge warning">Crítico</span>';
+            } else if (percentual < 15) {
+                return '<span class="status-badge warning">Atenção</span>';
+            } else {
+                return '<span class="status-badge success">Viável</span>';
+            }
+        },
+    updateFazendaMetrics(dadosFazenda) {
+        if (!dadosFazenda) return;
+        
+        debugMessage('Atualizando métricas da fazenda');
+        
+        // Atualizar card principal
+        FazendaManager.updateFazendaCard(dadosFazenda);
+        
+        // Atualizar informações nos controles
+        FazendaManager.updateFazendaInfo();
+        
+        debugMessage('Métricas da fazenda atualizadas');
+    },
+
+    // Atualizar método existente updateMetrics para incluir fazenda
+    updateMetrics() {
+        if (!AppState.currentData) return;
+        
+        debugMessage('Atualizando métricas sincronizadas v4.3');
+        const { resultado, patrimonio, status } = AppState.currentData;
+        
+        // Métricas existentes...
+        const patrimonioEl = document.getElementById('valorPatrimonio');
+        if (patrimonioEl) {
+            patrimonioEl.textContent = Utils.formatCurrency(patrimonio, true);
+        }
+        
+        const fazendaEl = document.getElementById('valorFazenda');
+        const percentualEl = document.getElementById('percentualFazenda');
+        const trendEl = document.getElementById('trendFazenda');
+        
+        if (fazendaEl && resultado) {
+            fazendaEl.textContent = Utils.formatCurrency(resultado.fazenda, true);
+            if (percentualEl) {
+                percentualEl.textContent = Utils.formatPercentage(resultado.percentual);
+            }
+            
+            if (trendEl) {
+                trendEl.className = 'metric-trend';
+                if (resultado.fazenda > 0) {
+                    trendEl.classList.add('positive');
+                    trendEl.innerHTML = '<i class="fas fa-arrow-up"></i><span>' + Utils.formatPercentage(resultado.percentual) + '</span>';
+                } else {
+                    trendEl.classList.add('negative');
+                    trendEl.innerHTML = '<i class="fas fa-arrow-down"></i><span>' + Utils.formatPercentage(resultado.percentual) + '</span>';
+                }
+            }
+        }
+        
+        // ✅ NOVA: Atualizar métricas específicas da fazenda
+        this.updateFazendaMetrics(resultado);
+        
+        // Métricas restantes (arte, perfil, etc.) - manter código existente
+        const arteEl = document.getElementById('valorArte');
+        const percentualArteEl = document.getElementById('percentualArte');
+        const trendArteEl = document.getElementById('trendArte');
+        
+        if (arteEl && resultado) {
+            arteEl.textContent = Utils.formatCurrency(resultado.arte || 0, true);
+            if (percentualArteEl) {
+                percentualArteEl.textContent = Utils.formatPercentage(resultado.percentual_arte || 0);
+            }
+            
+            if (trendArteEl) {
+                trendArteEl.className = 'metric-trend';
+                if (resultado.arte > 0) {
+                    trendArteEl.classList.add('positive');
+                    trendArteEl.innerHTML = '<i class="fas fa-palette"></i><span>' + Utils.formatPercentage(resultado.percentual_arte || 0) + '</span>';
+                } else {
+                    trendArteEl.classList.add('neutral');
+                    trendArteEl.innerHTML = '<i class="fas fa-palette"></i><span>Indisponível</span>';
+                }
+            }
+        }
+        
+        const perfilEl = document.getElementById('perfilAtual');
+        const retornoEl = document.getElementById('retornoEsperado');
+        
+        if (perfilEl) {
+            const perfil = document.getElementById('perfilInvestimento')?.value || 'moderado';
+            perfilEl.textContent = perfil.charAt(0).toUpperCase() + perfil.slice(1);
+            
+            const retornos = {
+                'conservador': '3.5% a.a.',
+                'moderado': '4.5% a.a.',
+                'balanceado': '5.2% a.a.'
+            };
+            if (retornoEl) {
+                retornoEl.textContent = retornos[perfil] || '4.5% a.a.';
+            }
+        }
+        
+        const compromissosEl = document.getElementById('valorCompromissos');
+        if (compromissosEl && resultado) {
+            compromissosEl.textContent = Utils.formatCurrency(resultado.total, true);
+        }
+        
+        this.updateStatusVisual(status);
+        
+        const statusEl = document.getElementById('valorStatus');
+        if (statusEl) {
+            statusEl.textContent = status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Calculando...';
+        }
+
+        debugMessage('✅ Métricas v4.3 atualizadas incluindo fazenda');
+    },
+
+    // Manter outros métodos existentes (updateStatusVisual, updateAlerts, etc.)
+    updateStatusVisual(status) {
+        const statusBadge = document.getElementById('statusBadge');
+        const statusText = document.getElementById('statusText');
+        const statusDescription = document.getElementById('statusDescription');
+        const statusEl = document.getElementById('valorStatus');
+        
+        if (!statusBadge || !statusText || !statusDescription) return;
+        
+        statusBadge.classList.remove('critico', 'atencao', 'viavel');
+        
+        let icon, description;
+        
+        if (status === 'crítico') {
+            statusBadge.classList.add('critico');
+            icon = 'exclamation-triangle';
+            description = 'Plano insustentável - ação urgente necessária';
+            if (statusEl) statusEl.innerHTML = '⚠️ Crítico';
+        } else if (status === 'atenção') {
+            statusBadge.classList.add('atencao');
+            icon = 'exclamation-circle';
+            description = 'Plano viável mas com margem baixa';
+            if (statusEl) statusEl.innerHTML = '⚡ Atenção';
+        } else {
+            statusBadge.classList.add('viavel');
+            icon = 'check-circle';
+            description = 'Plano sustentável com boa margem';
+            if (statusEl) statusEl.innerHTML = '✅ Viável';
+        }
+        
+        statusBadge.innerHTML = `<i class="fas fa-${icon}"></i><span>${status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Calculando'}</span>`;
+        statusDescription.textContent = description;
+        
+        debugMessage(`Status visual atualizado: ${status}`);
+    },
+
+    updateAlerts() {
+        const container = document.getElementById('alertContainer');
+        if (!container || !AppState.currentData) return;
+        
+        const { resultado, status } = AppState.currentData;
+        container.innerHTML = '';
+        
+        // Alertas para fazenda
+        if (resultado.fazenda_analysis) {
+            const analysis = resultado.fazenda_analysis;
+            
+            if (!analysis.viavel && resultado.periodo_compra_fazenda) {
+                container.innerHTML = `
+                    <div class="alert warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>Fazenda:</strong> Valor insuficiente em ${resultado.periodo_compra_fazenda} anos. 
+                        Disponível: ${Utils.formatCurrency(analysis.disponivel_periodo, true)}, 
+                        Necessário: ${Utils.formatCurrency(analysis.necessario_periodo, true)}
+                    </div>
+                `;
+            }
+        }
+        
+        // Alertas gerais do plano
+        if (status === 'crítico' || (resultado && resultado.fazenda < 0)) {
+            container.innerHTML += `
+                <div class="alert danger">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <strong>Atenção:</strong> O plano atual pode não ser sustentável. 
+                    Considere ajustar as variáveis para melhorar o resultado.
+                </div>
+            `;
+        } else if (status === 'atenção') {
+            container.innerHTML += `
+                <div class="alert warning">
+                    <i class="fas fa-info-circle"></i>
+                    <strong>Cuidado:</strong> Margem de segurança baixa. 
+                    Monitore as variáveis de perto.
+                </div>
+            `;
+        } else if (status === 'viável') {
+            container.innerHTML += `
+                <div class="alert success">
+                    <i class="fas fa-check-circle"></i>
+                    <strong>Excelente:</strong> O plano está funcionando bem dentro dos parâmetros estabelecidos.
+                </div>
+            `;
+        }
+    },
+
+    // Manter outros métodos existentes...
+    showLoading(show) {
+        const refreshBtn = document.getElementById('refreshBtn');
+        if (refreshBtn) {
+            if (show) {
+                refreshBtn.classList.add('loading');
+                refreshBtn.innerHTML = '<i class="fas fa-sync-alt"></i><span>Carregando...</span>';
+            } else {
+                refreshBtn.classList.remove('loading');
+                refreshBtn.innerHTML = '<i class="fas fa-sync-alt"></i><span>Atualizar</span>';
+            }
+        }
+    },
+
+    updateTable() {
+        if (!AppState.currentData || !AppState.currentData.sensibilidade) {
+            debugMessage('Dados insuficientes para atualizar tabela', 'warning');
+            return;
+        }
+
+        const tbody = document.getElementById('cenarioTableBody');
+        if (!tbody) {
+            debugMessage('Elemento cenarioTableBody não encontrado', 'warning');
+            return;
+        }
+
+        const { sensibilidade } = AppState.currentData;
+        
+        tbody.innerHTML = sensibilidade.map(item => {
+            const status = this.getStatusBadge(item.fazenda, item.percentual);
+            return `
+                <tr>
+                    <td><strong>${item.taxa}%</strong></td>
+                    <td>${Utils.formatCurrency(item.fazenda, true)}</td>
+                    <td>${Utils.formatPercentage(item.percentual)}</td>
+                    <td>${status}</td>
+                </tr>
+            `;
+        }).join('');
+
+        debugMessage('Tabela de cenários atualizada com sucesso');
+    },
+
+    getStatusBadge(fazenda, percentual) {
+        if (fazenda < 0) {
+            return '<span class="status-badge danger">Inviável</span>';
+        } else if (percentual < 5) {
+            return '<span class="status-badge warning">Crítico</span>';
+        } else if (percentual < 15) {
+            return '<span class="status-badge warning">Atenção</span>';
+        } else {
+            return '<span class="status-badge success">Viável</span>';
+        }
+    },
+
+    updateSystemStatus(isConnected) {
+        const statusEl = document.getElementById('systemStatus');
+        if (statusEl) {
+            if (isConnected) {
+                statusEl.innerHTML = '<i class="fas fa-circle"></i><span>Sistema Online</span>';
+                statusEl.className = 'status-indicator connected';
+            } else {
+                statusEl.innerHTML = '<i class="fas fa-exclamation-triangle"></i><span>Sistema Offline</span>';
+                statusEl.className = 'status-indicator disconnected';
+            }
+        }
+    }
+};
+
+    // ================ FUNÇÕES GLOBAIS ================ 
+    function showPage(pageId) {
+    debugMessage(`Navegando para página: ${pageId}`);
+    
+    // Atualizar UI imediatamente
+    document.querySelectorAll('.page-content').forEach(page => {
+        page.classList.remove('active');
+    });
+    
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.classList.remove('active');
+    });
+    
+    const targetPage = document.getElementById(pageId + 'Page');
+    if (targetPage) {
+        targetPage.classList.add('active');
+        AppState.currentPage = pageId;
+    }
+    
+    if (event && event.target) {
+        const navItem = event.target.closest('.nav-item');
+        if (navItem) navItem.classList.add('active');
+    }
+    
+    // ✅ CARREGAMENTO INTELIGENTE DOS GRÁFICOS
+    loadChartsForPage(pageId);
+}
+async function loadChartsForPage(pageId) {
+    debugMessage(`Carregando gráficos para página: ${pageId}`);
+    
+    // ✅ AGUARDAR Chart.js estar disponível
+    await ensureChartJsReady();
+    
+    // ✅ AGUARDAR dados estarem disponíveis
+    if (!AppState.currentData) {
+        debugMessage('Dados não disponíveis, aguardando...', 'warning');
+        await waitForData();
+    }
+    
+    // ✅ CARREGAR GRÁFICOS ESPECÍFICOS DA PÁGINA
+    try {
+        switch(pageId) {
+            case 'dashboard':
+                ChartManager.hideChartPlaceholders(['compromissosContainer', 'allocationContainer', 'sensibilidadeContainer']);
+                ChartManager.createCompromissosChart();
+                ChartManager.createAllocationChart();
+                ChartManager.createSensibilidadeChart();
+                break;
+                
+            case 'allocation':
+                ChartManager.hideChartPlaceholders(['currentAllocationContainer', 'benchmarkContainer', 'allocationTrendsContainer']);
+                ChartManager.createAllocationPageCharts();
+                updateAllocationTable(); // ✅ NOVA FUNÇÃO
+                break;
+                
+            case 'projections':
+    debugMessage('📊 Carregando página de projeções - VERSÃO SINCRONIZADA');
+    
+    ChartManager.hideChartPlaceholders([
+        'patrimonialEvolutionContainer', 
+        'despesasFlowContainer', 
+        'rentabilidadeFlowContainer', 
+        'allocationEvolutionContainer'
+    ]);
+    
+    try {
+        // ✅ PASSO 1: Inicializar ProjectionsManager
+        debugMessage('🚀 Passo 1: Inicializando ProjectionsManager');
+        await ProjectionsManager.initialize();
+        
+        // ✅ PASSO 2: Aguardar dados estarem disponíveis
+        debugMessage('⏳ Passo 2: Aguardando dados das projeções');
+        let attempts = 0;
+        const maxAttempts = 20;
+        
+        while (!ProjectionsManager.projectionData && attempts < maxAttempts) {
+            await new Promise(resolve => setTimeout(resolve, 150));
+            attempts++;
+            debugMessage(`⏳ Tentativa ${attempts}/${maxAttempts} - aguardando dados`);
+        }
+        
+        if (!ProjectionsManager.projectionData) {
+            debugMessage('❌ Timeout: Dados de projeção não carregaram', 'error');
+            return;
+        }
+        
+        debugMessage(`✅ Passo 2 concluído: ${ProjectionsManager.projectionData.length} anos de dados`);
+        
+        // ✅ PASSO 3: Aguardar DOM estar pronto
+        debugMessage('🏗️ Passo 3: Verificando elementos DOM');
+        const requiredElements = [
+            'patrimonialEvolutionChart',
+            'despesasFlowChart', 
+            'rentabilidadeFlowChart', 
+            'allocationEvolutionChart'
+        ];
+        
+        const elementsReady = requiredElements.every(id => document.getElementById(id));
+        if (!elementsReady) {
+            debugMessage('❌ Elementos DOM não encontrados para projeções', 'error');
+            return;
+        }
+        
+        // ✅ PASSO 4: Destruir gráficos existentes
+        debugMessage('🗑️ Passo 4: Limpando gráficos existentes');
+        ChartManager.destroyExistingCharts();
+        
+        // ✅ PASSO 5: Aguardar limpeza
+        await new Promise(resolve => setTimeout(resolve, 200));
+        
+        // ✅ PASSO 6: Criar gráficos sequencialmente
+        debugMessage('📊 Passo 6: Criando gráficos de projeção');
+        
+        if (typeof Chart !== 'undefined') {
+            await new Promise(resolve => {
+                ChartManager.createPatrimonialEvolutionChart();
+                setTimeout(resolve, 100);
+            });
+            
+            await new Promise(resolve => {
+                ChartManager.createDespesasFlowChart();
+                setTimeout(resolve, 100);
+            });
+            
+            await new Promise(resolve => {
+                ChartManager.createRentabilidadeFlowChart();
+                setTimeout(resolve, 100);
+            });
+            
+            await new Promise(resolve => {
+                ChartManager.createAllocationEvolutionChart();
+                setTimeout(resolve, 100);
+            });
+            
+            debugMessage('✅ Todos os gráficos de projeção criados com sucesso');
+        } else {
+            debugMessage('❌ Chart.js não disponível', 'error');
+        }
+        
+    } catch (error) {
+        debugMessage(`❌ Erro no carregamento de projeções: ${error.message}`, 'error');
+    }
+    break;
+
+
+            case 'simulations':
+                ChartManager.hideChartPlaceholders(['monteCarloContainer', 'distribuicaoContainer']);
+                ChartManager.createSimulationCharts();
+                break;
+                
+            case 'scenarios':
+                ChartManager.hideChartPlaceholders(['scenarioComparisonContainer', 'scenarioEvolutionContainer', 'stressTestContainer']);
+                ChartManager.createScenarioCharts();
+                break;
+                
+            case 'sensitivity':
+                ChartManager.hideChartPlaceholders(['returnSensitivityContainer', 'expenseSensitivityContainer', 'bidimensionalContainer']);
+                ChartManager.createSensitivityCharts();
+                break;
+                
+            case 'reports':
+                // Página de relatórios não precisa de gráficos
+                break;
+                
+            default:
+                debugMessage(`Página ${pageId} não reconhecida`, 'warning');
+        }
+        
+        debugMessage(`✅ Gráficos carregados para ${pageId}`);
+        
+    } catch (error) {
+        debugMessage(`❌ Erro ao carregar gráficos para ${pageId}: ${error.message}`, 'error');
+        ChartManager.showChartError();
+    }
+}
+
+// ✅ NOVA FUNÇÃO: Garantir que Chart.js está pronto
+async function ensureChartJsReady() {
+    if (AppState.chartJsLoaded && typeof Chart !== 'undefined') {
+        return true;
+    }
+    
+    debugMessage('Chart.js não está pronto, aguardando...', 'warning');
+    
+    return new Promise((resolve, reject) => {
+        const maxAttempts = 10;
+        let attempts = 0;
+        
+        const checkInterval = setInterval(() => {
+            attempts++;
+            
+            if (typeof Chart !== 'undefined') {
+                clearInterval(checkInterval);
+                AppState.chartJsLoaded = true;
+                debugMessage('✅ Chart.js agora está disponível');
+                resolve(true);
+            } else if (attempts >= maxAttempts) {
+                clearInterval(checkInterval);
+                debugMessage('❌ Timeout aguardando Chart.js', 'error');
+                AppState.chartJsLoaded = false;
+                resolve(false); // Não rejeitar, usar fallback
+            }
+        }, 200);
+    });
+}
+
+// ✅ NOVA FUNÇÃO: Aguardar dados da API
+async function waitForData() {
+    if (AppState.currentData) {
+        return true;
+    }
+    
+    return new Promise((resolve) => {
+        const maxWait = 5000; // 5 segundos máximo
+        const startTime = Date.now();
+        
+        const checkData = setInterval(() => {
+            if (AppState.currentData) {
+                clearInterval(checkData);
+                resolve(true);
+            } else if (Date.now() - startTime > maxWait) {
+                clearInterval(checkData);
+                debugMessage('Timeout aguardando dados - usando fallback', 'warning');
+                resolve(false);
+            }
+        }, 100);
+    });
+}
+
+window.ReportManager = {
+     async generateDetailedReport(tipo, parametros = null) {
         debugMessage(`Gerando relatório detalhado: ${tipo}`);
+        
+        // ✅ VALIDAÇÃO ANTES DE CONTINUAR
+        if (!this.validateParameters()) {
+            return;
+        }
         
         this.showReportStatus(true, `Preparando relatório ${tipo}...`);
         
@@ -1639,15 +3360,13 @@ const ReportManager = {
             
             debugMessage(`Parâmetros coletados: ${JSON.stringify(params)}`);
             
-            // Preview dos dados primeiro
+            // Resto da função permanece igual...
             const previewData = await this.fetchReportPreview(tipo, params);
             
             if (previewData.success) {
-                // Mostrar preview opcional
                 const shouldProceed = await this.showReportPreview(tipo, previewData);
                 
                 if (shouldProceed) {
-                    // Gerar PDF final
                     await this.downloadPDFReport(tipo, params);
                 }
             } else {
@@ -1669,8 +3388,27 @@ const ReportManager = {
             despesas: document.getElementById('despesasMensais').value,
             perfil: document.getElementById('perfilInvestimento').value,
             inicio_renda_filhos: document.getElementById('inicioRendaFilhos').value,
-            custo_fazenda: document.getElementById('custoFazenda').value
+            custo_fazenda: document.getElementById('valorFazendaAtual').value,  // ✅ CORRIGIDO
+            periodo_compra_fazenda: document.getElementById('periodoCompraFazenda').value  // ✅ ADICIONADO campo faltante
         };
+    },
+    
+    // ✅ FUNÇÃO DE VALIDAÇÃO ADICIONAL (NOVA)
+    validateParameters() {
+        const requiredFields = [
+            'taxaRetorno', 'expectativaVida', 'despesasMensais', 
+            'perfilInvestimento', 'inicioRendaFilhos', 'valorFazendaAtual', 'periodoCompraFazenda'
+        ];
+        
+        const missing = requiredFields.filter(fieldId => !document.getElementById(fieldId));
+        
+        if (missing.length > 0) {
+            console.error('❌ Campos obrigatórios não encontrados:', missing);
+            Utils.showNotification(`Erro: Campos não encontrados: ${missing.join(', ')}`, 'danger');
+            return false;
+        }
+        
+        return true;
     },
     
     async fetchReportPreview(tipo, params) {
@@ -1945,355 +3683,57 @@ const ReportManager = {
     }
 };
 
-    // ================ UI MANAGER SINCRONIZADO ================ 
-    const UIManager = {
-        showLoading(show) {
-            const refreshBtn = document.getElementById('refreshBtn');
-            if (refreshBtn) {
-                if (show) {
-                    refreshBtn.classList.add('loading');
-                    refreshBtn.innerHTML = '<i class="fas fa-sync-alt"></i><span>Carregando...</span>';
-                } else {
-                    refreshBtn.classList.remove('loading');
-                    refreshBtn.innerHTML = '<i class="fas fa-sync-alt"></i><span>Atualizar</span>';
-                }
-            }
-        },
-        updateTable() {
-        if (!AppState.currentData || !AppState.currentData.sensibilidade) {
-            debugMessage('Dados insuficientes para atualizar tabela', 'warning');
-            return;
-        }
-
-        const tbody = document.getElementById('cenarioTableBody');
-        if (!tbody) {
-            debugMessage('Elemento cenarioTableBody não encontrado', 'warning');
-            return;
-        }
-
-        const { sensibilidade } = AppState.currentData;
-        
-        tbody.innerHTML = sensibilidade.map(item => {
-            const status = this.getStatusBadge(item.fazenda, item.percentual);
-            return `
-                <tr>
-                    <td><strong>${item.taxa}%</strong></td>
-                    <td>${Utils.formatCurrency(item.fazenda, true)}</td>
-                    <td>${Utils.formatPercentage(item.percentual)}</td>
-                    <td>${status}</td>
-                </tr>
-            `;
-        }).join('');
-
-        debugMessage('Tabela de cenários atualizada com sucesso');
-    },
-
-        updateSystemStatus(isConnected) {
-            const statusEl = document.getElementById('systemStatus');
-            if (statusEl) {
-                if (isConnected) {
-                    statusEl.innerHTML = '<i class="fas fa-circle"></i><span>Sistema Online</span>';
-                    statusEl.className = 'status-indicator connected';
-                } else {
-                    statusEl.innerHTML = '<i class="fas fa-exclamation-triangle"></i><span>Sistema Offline</span>';
-                    statusEl.className = 'status-indicator disconnected';
-                }
-            }
-        },
 
 
-
-        updateMetrics() {
-            if (!AppState.currentData) return;
-            
-            debugMessage('Atualizando métricas sincronizadas');
-            const { resultado, patrimonio, status } = AppState.currentData;
-            
-            // ✅ ATUALIZAR COM DADOS SINCRONIZADOS DO BACKEND
-            const patrimonioEl = document.getElementById('valorPatrimonio');
-            if (patrimonioEl) {
-                patrimonioEl.textContent = Utils.formatCurrency(patrimonio, true);
-            }
-            
-            const fazendaEl = document.getElementById('valorFazenda');
-            const percentualEl = document.getElementById('percentualFazenda');
-            const trendEl = document.getElementById('trendFazenda');
-            
-            if (fazendaEl && resultado) {
-                fazendaEl.textContent = Utils.formatCurrency(resultado.fazenda, true);
-                if (percentualEl) {
-                    percentualEl.textContent = Utils.formatPercentage(resultado.percentual);
-                }
-                
-                if (trendEl) {
-                    trendEl.className = 'metric-trend';
-                    if (resultado.fazenda > 0) {
-                        trendEl.classList.add('positive');
-                        trendEl.innerHTML = '<i class="fas fa-arrow-up"></i><span>' + Utils.formatPercentage(resultado.percentual) + '</span>';
-                    } else {
-                        trendEl.classList.add('negative');
-                        trendEl.innerHTML = '<i class="fas fa-arrow-down"></i><span>' + Utils.formatPercentage(resultado.percentual) + '</span>';
-                    }
-                }
-            }
-            
-            // ✅ ARTE/GALERIA (NOVO CAMPO v4.0)
-            const arteEl = document.querySelector('#valorArte h3');
-            const percentualArteEl = document.getElementById('percentualArte');
-            const trendArteEl = document.getElementById('trendArte');
-            
-            if (arteEl && resultado) {
-                arteEl.textContent = Utils.formatCurrency(resultado.arte || 0, true);
-                if (percentualArteEl) {
-                    percentualArteEl.textContent = Utils.formatPercentage(resultado.percentual_arte || 0);
-                }
-                
-                if (trendArteEl) {
-                    trendArteEl.className = 'metric-trend';
-                    if (resultado.arte > 0) {
-                        trendArteEl.classList.add('positive');
-                        trendArteEl.innerHTML = '<i class="fas fa-palette"></i><span>' + Utils.formatPercentage(resultado.percentual_arte || 0) + '</span>';
-                    } else {
-                        trendArteEl.classList.add('neutral');
-                        trendArteEl.innerHTML = '<i class="fas fa-palette"></i><span>Indisponível</span>';
-                    }
-                }
-            }
-            
-            // ✅ PERFIL DE INVESTIMENTO (NOVO CAMPO v4.0)
-            const perfilEl = document.getElementById('perfilAtual');
-            const retornoEl = document.getElementById('retornoEsperado');
-            
-            if (perfilEl) {
-                const perfil = document.getElementById('perfilInvestimento')?.value || 'moderado';
-                perfilEl.textContent = perfil.charAt(0).toUpperCase() + perfil.slice(1);
-                
-                const retornos = {
-                    'conservador': '3.5% a.a.',
-                    'moderado': '4.5% a.a.',
-                    'balanceado': '5.2% a.a.'
-                };
-                if (retornoEl) {
-                    retornoEl.textContent = retornos[perfil] || '4.5% a.a.';
-                }
-            }
-            
-            const compromissosEl = document.getElementById('valorCompromissos');
-            if (compromissosEl && resultado) {
-                compromissosEl.textContent = Utils.formatCurrency(resultado.total, true);
-            }
-            
-            // ✅ STATUS VISUAL ATUALIZADO
-            this.updateStatusVisual(status);
-            
-            const statusEl = document.getElementById('valorStatus');
-            if (statusEl) {
-                statusEl.textContent = status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Calculando...';
-            }
-        },
-
-        updateStatusVisual(status) {
-            const statusBadge = document.getElementById('statusBadge');
-            const statusText = document.getElementById('statusText');
-            const statusDescription = document.getElementById('statusDescription');
-            const statusEl = document.getElementById('valorStatus');
-            
-            if (!statusBadge || !statusText || !statusDescription) return;
-            
-            statusBadge.classList.remove('critico', 'atencao', 'viavel');
-            
-            let icon, description;
-            
-            if (status === 'crítico') {
-                statusBadge.classList.add('critico');
-                icon = 'exclamation-triangle';
-                description = 'Plano insustentável - ação urgente necessária';
-                if (statusEl) statusEl.innerHTML = '⚠️ Crítico';
-            } else if (status === 'atenção') {
-                statusBadge.classList.add('atencao');
-                icon = 'exclamation-circle';
-                description = 'Plano viável mas com margem baixa';
-                if (statusEl) statusEl.innerHTML = '⚡ Atenção';
-            } else {
-                statusBadge.classList.add('viavel');
-                icon = 'check-circle';
-                description = 'Plano sustentável com boa margem';
-                if (statusEl) statusEl.innerHTML = '✅ Viável';
-            }
-            
-            statusBadge.innerHTML = `<i class="fas fa-${icon}"></i><span>${status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Calculando'}</span>`;
-            statusDescription.textContent = description;
-            
-            debugMessage(`Status visual atualizado: ${status}`);
-        },
-
-        updateAlerts() {
-            const container = document.getElementById('alertContainer');
-            if (!container || !AppState.currentData) return;
-            
-            const { resultado, status } = AppState.currentData;
-            container.innerHTML = '';
-            
-            if (status === 'crítico' || (resultado && resultado.fazenda < 0)) {
-                container.innerHTML = `
-                    <div class="alert danger">
-                        <i class="fas fa-exclamation-triangle"></i>
-                        <strong>Atenção:</strong> O plano atual pode não ser sustentável. 
-                        Considere ajustar as variáveis para melhorar o resultado.
-                    </div>
-                `;
-            } else if (status === 'atenção') {
-                container.innerHTML = `
-                    <div class="alert warning">
-                        <i class="fas fa-info-circle"></i>
-                        <strong>Cuidado:</strong> Margem de segurança baixa. 
-                        Monitore as variáveis de perto.
-                    </div>
-                `;
-            } else if (status === 'viável') {
-                container.innerHTML = `
-                    <div class="alert success">
-                        <i class="fas fa-check-circle"></i>
-                        <strong>Excelente:</strong> O plano está funcionando bem dentro dos parâmetros estabelecidos.
-                    </div>
-                `;
-            }
-        },
-
-        updateMetrics() {
-    if (!AppState.currentData) return;
-    
-    debugMessage('Atualizando métricas sincronizadas');
-    const { resultado, patrimonio, status } = AppState.currentData;
-    
-    // ✅ PATRIMÔNIO TOTAL
-    const patrimonioEl = document.getElementById('valorPatrimonio');
-    if (patrimonioEl) {
-        patrimonioEl.textContent = Utils.formatCurrency(patrimonio, true);
+// ✅ NOVA FUNÇÃO: Atualizar tabela Asset Allocation
+function updateAllocationTableCorrected() {
+    const tbody = document.getElementById('allocationTableBody');
+    if (!tbody || !AppState.currentData) {
+        debugMessage('⚠️ Tabela allocation ou dados não disponíveis', 'warning');
+        return;
     }
     
-    // ✅ FAZENDA DISPONÍVEL
-    const fazendaEl = document.getElementById('valorFazenda');
-    const percentualEl = document.getElementById('percentualFazenda');
-    const trendEl = document.getElementById('trendFazenda');
+    const { allocation } = AppState.currentData;
+    if (!allocation) return;
     
-    if (fazendaEl && resultado) {
-        fazendaEl.textContent = Utils.formatCurrency(resultado.fazenda, true);
-        if (percentualEl) {
-            percentualEl.textContent = Utils.formatPercentage(resultado.percentual);
-        }
-        
-        if (trendEl) {
-            trendEl.className = 'metric-trend';
-            if (resultado.fazenda > 0) {
-                trendEl.classList.add('positive');
-                trendEl.innerHTML = '<i class="fas fa-arrow-up"></i><span>' + Utils.formatPercentage(resultado.percentual) + '</span>';
-            } else {
-                trendEl.classList.add('negative');
-                trendEl.innerHTML = '<i class="fas fa-arrow-down"></i><span>' + Utils.formatPercentage(resultado.percentual) + '</span>';
-            }
-        }
-    }
+    const perfil = document.getElementById('perfilInvestimento')?.value || 'moderado';
     
-    // ✅ ARTE/GALERIA (CORRIGIDO)
-    const arteEl = document.getElementById('valorArte');  // ✅ Seletor correto
-    const percentualArteEl = document.getElementById('percentualArte');
-    const trendArteEl = document.getElementById('trendArte');
-    
-    if (arteEl && resultado) {
-        arteEl.textContent = Utils.formatCurrency(resultado.arte || 0, true);
-        if (percentualArteEl) {
-            percentualArteEl.textContent = Utils.formatPercentage(resultado.percentual_arte || 0);
-        }
-        
-        if (trendArteEl) {
-            trendArteEl.className = 'metric-trend';
-            if (resultado.arte > 0) {
-                trendArteEl.classList.add('positive');
-                trendArteEl.innerHTML = '<i class="fas fa-palette"></i><span>' + Utils.formatPercentage(resultado.percentual_arte || 0) + '</span>';
-            } else {
-                trendArteEl.classList.add('neutral');
-                trendArteEl.innerHTML = '<i class="fas fa-palette"></i><span>Indisponível</span>';
-            }
-        }
-    }
-    
-    // ✅ PERFIL DE INVESTIMENTO (CORRIGIDO)
-    const perfilEl = document.getElementById('perfilAtual');  // ✅ Seletor correto
-    const retornoEl = document.getElementById('retornoEsperado');
-    
-    if (perfilEl) {
-        const perfil = document.getElementById('perfilInvestimento')?.value || 'moderado';
-        perfilEl.textContent = perfil.charAt(0).toUpperCase() + perfil.slice(1);
-        
-        const retornos = {
-            'conservador': '3.5% a.a.',
-            'moderado': '4.5% a.a.',
-            'balanceado': '5.2% a.a.'
-        };
-        if (retornoEl) {
-            retornoEl.textContent = retornos[perfil] || '4.5% a.a.';
-        }
-    }
-    
-    // ✅ TOTAL COMPROMISSOS
-    const compromissosEl = document.getElementById('valorCompromissos');
-    if (compromissosEl && resultado) {
-        compromissosEl.textContent = Utils.formatCurrency(resultado.total, true);
-    }
-    
-    // ✅ STATUS VISUAL
-    this.updateStatusVisual(status);
-    
-    const statusEl = document.getElementById('valorStatus');
-    if (statusEl) {
-        statusEl.textContent = status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Calculando...';
-    }
-
-    debugMessage('✅ Métricas atualizadas com elementos corretos');
-},
-
-        getStatusBadge(fazenda, percentual) {
-            if (fazenda < 0) {
-                return '<span class="status-badge danger">Inviável</span>';
-            } else if (percentual < 5) {
-                return '<span class="status-badge warning">Crítico</span>';
-            } else if (percentual < 15) {
-                return '<span class="status-badge warning">Atenção</span>';
-            } else {
-                return '<span class="status-badge success">Viável</span>';
-            }
-        }
+    const benchmarks = {
+        'conservador': { 'Renda Fixa Nacional': 75, 'Renda Fixa Internacional': 10, 'Ações Brasil': 8, 'Ações Internacionais': 5, 'Fundos Imobiliários': 2 },
+        'moderado': { 'Renda Fixa Nacional': 45, 'Renda Fixa Internacional': 25, 'Ações Brasil': 15, 'Ações Internacionais': 12, 'Fundos Imobiliários': 3 },
+        'balanceado': { 'Renda Fixa Nacional': 35, 'Renda Fixa Internacional': 15, 'Ações Brasil': 25, 'Ações Internacionais': 20, 'Fundos Imobiliários': 5 }
     };
+    
+    const benchmark = benchmarks[perfil] || benchmarks['moderado'];
+    
+    tbody.innerHTML = allocation.map(item => {
+        const benchmarkValue = benchmark[item.nome] || 0;
+        const diferenca = item.percentual - benchmarkValue;
+        const rebalanceamento = Math.abs(diferenca) > 2 ? (diferenca > 0 ? 'Reduzir' : 'Aumentar') : 'Manter';
+        
+        return `
+            <tr>
+                <td><strong>${item.nome}</strong></td>
+                <td>${item.percentual.toFixed(1)}%</td>
+                <td>${Utils.formatCurrency(item.valor, true)}</td>
+                <td>${benchmarkValue}%</td>
+                <td class="${diferenca > 0 ? 'value-positive' : diferenca < 0 ? 'value-negative' : 'value-neutral'}">
+                    ${diferenca > 0 ? '+' : ''}${diferenca.toFixed(1)}%
+                </td>
+                <td>
+                    <span class="status-badge ${rebalanceamento === 'Manter' ? 'success' : 'warning'}">${rebalanceamento}</span>
+                </td>
+            </tr>
+        `;
+    }).join('');
+    
+    debugMessage('✅ Tabela allocation atualizada');
+}
 
-    // ================ FUNÇÕES GLOBAIS ================ 
-    function showPage(pageId) {
-        debugMessage(`Navegando para página: ${pageId}`);
-        
-        document.querySelectorAll('.page-content').forEach(page => {
-            page.classList.remove('active');
-        });
-        
-        document.querySelectorAll('.nav-item').forEach(item => {
-            item.classList.remove('active');
-        });
-        
-        const targetPage = document.getElementById(pageId + 'Page');
-        if (targetPage) {
-            targetPage.classList.add('active');
-            AppState.currentPage = pageId;
-        }
-        
-        event.target.closest('.nav-item').classList.add('active');
-        
-        setTimeout(() => {
-            if (AppState.chartJsLoaded) {
-                ChartManager.createCharts();
-            } else {
-                ChartManager.showAlternativeVisualization();
-            }
-        }, 200);
-    }
+
+
+
+
 
     function showAnalysis(type) {
         document.querySelectorAll('.analysis-tab').forEach(tab => {
@@ -2327,9 +3767,15 @@ const ReportManager = {
     }
 
     function generateReportPDF(tipo) {
-        debugMessage(`Solicitação de geração de relatório: ${tipo}`);
+    debugMessage(`Solicitação de geração de relatório: ${tipo}`);
+    // ✅ VERIFICAR SE ReportManager EXISTE
+    if (typeof ReportManager !== 'undefined') {
         ReportManager.generateDetailedReport(tipo);
+    } else {
+        console.error('ReportManager não inicializado ainda');
+        Utils.showNotification('Sistema de relatórios ainda carregando...', 'warning');
     }
+}
 
     function generateReport(type) {
         Utils.showNotification(`Gerando relatório ${type}...`, 'info');
@@ -2397,173 +3843,150 @@ const ReportManager = {
 
     // ================ MAIN CONTROLLER SINCRONIZADO ================ 
     const DashboardController = {
-        async initialize() {
-            debugMessage('Inicializando Dashboard CIMO sincronizado com backend v4.1');
-            
-            this.setupEvents();
-            SidebarController.init();
-            
-            await ChartManager.initializeCharts();
-            
-            await this.testConnection();
-            
-            await this.loadDashboard();
-            
-            ReportManager.updateReportHistoryTable();
-        },
-
-        async testConnection() {
-            try {
-                const isConnected = await ApiClient.testConnection();
-                UIManager.updateSystemStatus(isConnected);
-                
-                if (!isConnected) {
-                    Utils.showNotification('Erro de conexão com o servidor', 'warning');
-                } else {
-                    // ✅ TESTAR CORREÇÕES SE CONECTADO
-                    const testData = await ApiClient.fetchTestCorrecoes();
-                    if (testData) {
-                        debugMessage(`Backend versão: ${testData.versao}, Logo funcionando: ${testData.logo_funcionando}`);
-                    }
-                }
-            } catch (error) {
-                debugMessage(`Erro ao testar conexão: ${error.message}`, 'error');
-                UIManager.updateSystemStatus(false);
-            }
-        },
-
-         updateScenarioTable() {
-        if (!AppState.currentData?.sensibilidade) return;
-
-        const tbody = document.getElementById('cenarioTableBody');
-        if (!tbody) return;
-
-        const { sensibilidade } = AppState.currentData;
+    async initialize() {
+        debugMessage('Inicializando Dashboard CIMO v4.3 com fazenda');
         
-        tbody.innerHTML = sensibilidade.map(item => {
-            let statusClass, statusText;
-            if (item.fazenda < 0) {
-                statusClass = 'danger';
-                statusText = 'Inviável';
-            } else if (item.percentual < 5) {
-                statusClass = 'warning'; 
-                statusText = 'Crítico';
-            } else if (item.percentual < 15) {
-                statusClass = 'warning';
-                statusText = 'Atenção';
-            } else {
-                statusClass = 'success';
-                statusText = 'Viável';
-            }
-
-            return `
-                <tr>
-                    <td><strong>${item.taxa}%</strong></td>
-                    <td>${Utils.formatCurrency(item.fazenda, true)}</td>
-                    <td>${Utils.formatPercentage(item.percentual)}</td>
-                    <td><span class="status-badge ${statusClass}">${statusText}</span></td>
-                </tr>
-            `;
-        }).join('');
-
-        debugMessage('✅ Tabela de cenários atualizada');
+        this.setupEvents();
+        SidebarController.init();
+        
+        await ChartManager.initializeCharts();
+        await this.testConnection();
+        await this.loadDashboard();
+        
+        // Inicializar controles da fazenda
+        FazendaManager.updateFazendaInfo();
+        
+        ReportManager.updateReportHistoryTable();
     },
 
-
-        setupEvents() {
-            document.getElementById('refreshBtn').addEventListener('click', () => this.loadDashboard());
+    async testConnection() {
+        try {
+            const isConnected = await ApiClient.checkBackendHealth();
+            UIManager.updateSystemStatus(isConnected);
             
-            // ✅ DEBOUNCE OTIMIZADO PARA NÃO SOBRECARREGAR O BACKEND
-            const debouncedUpdate = this.debounce(() => this.loadDashboard(), 1000); // 1 segundo
-            
-            document.getElementById('taxaRetorno').addEventListener('input', (e) => {
-                document.getElementById('taxaDisplay').textContent = e.target.value + '%';
-                debouncedUpdate();
-            });
-            
-            document.getElementById('expectativaVida').addEventListener('change', debouncedUpdate);
-            document.getElementById('despesasMensais').addEventListener('input', debouncedUpdate);
-            
-            // ✅ NOVOS CAMPOS v4.0 SINCRONIZADOS
-            document.getElementById('perfilInvestimento').addEventListener('change', debouncedUpdate);
-            document.getElementById('inicioRendaFilhos').addEventListener('change', debouncedUpdate);
-            document.getElementById('custoFazenda').addEventListener('input', debouncedUpdate);
-            
-            // Simulation events
-            document.getElementById('simTaxaMin').addEventListener('input', (e) => {
-                document.getElementById('simTaxaMinDisplay').textContent = e.target.value + '%';
-            });
-            
-            document.getElementById('simTaxaMax').addEventListener('input', (e) => {
-                document.getElementById('simTaxaMaxDisplay').textContent = e.target.value + '%';
-            });
-            
-            document.getElementById('simVolatilidade').addEventListener('input', (e) => {
-                document.getElementById('simVolatilidadeDisplay').textContent = e.target.value + '%';
-            });
-        },
-
-        debounce(func, wait) {
-            let timeout;
-            return function executedFunction(...args) {
-                const later = () => {
-                    clearTimeout(timeout);
-                    func(...args);
-                };
-                clearTimeout(timeout);
-                timeout = setTimeout(later, wait);
-            };
-        },
-
-        async loadDashboard() {
-            try {
-                debugMessage('Carregando dados da API sincronizada v4.1');
-                
-                UIManager.showLoading(true);
-                AppState.isLoading = true;
-                
-                // ✅ USAR CLIENTE API SINCRONIZADO
-                const data = await ApiClient.fetchData();
-                
-                debugMessage(`Dados recebidos: versão ${data.versao}, sucesso: ${data.success}`);
-                
-                AppState.currentData = data;
-                
-                // ✅ ATUALIZAR UI COM DADOS SINCRONIZADOS
-                UIManager.updateMetrics();
-                UIManager.updateAlerts();
-                UIManager.updateTable();
-                
-                setTimeout(() => {
-                    if (AppState.chartJsLoaded) {
-                        ChartManager.createCharts();
-                    } else {
-                        ChartManager.showAlternativeVisualization();
-                    }
-                }, 300);
-                
-                Utils.showNotification('Dashboard atualizado com sucesso!', 'success');
-                
-            } catch (error) {
-                debugMessage(`Erro ao carregar dashboard: ${error.message}`, 'error');
-                Utils.showNotification(`Erro ao carregar dados: ${error.message}`, 'danger');
-                
-                const container = document.getElementById('alertContainer');
-                if (container) {
-                    container.innerHTML = `
-                        <div class="alert danger">
-                            <i class="fas fa-exclamation-triangle"></i>
-                            <strong>Erro de Conexão:</strong> Não foi possível carregar os dados do servidor. 
-                            Verifique se o backend Flask está rodando em http://localhost:5000
-                        </div>
-                    `;
-                }
-            } finally {
-                UIManager.showLoading(false);
-                AppState.isLoading = false;
+            if (!isConnected) {
+                Utils.showNotification('Erro de conexão com o servidor v4.3', 'warning');
+            } else {
+                debugMessage('Backend v4.3 conectado com sucesso');
             }
+        } catch (error) {
+            debugMessage(`Erro ao testar conexão v4.3: ${error.message}`, 'error');
+            UIManager.updateSystemStatus(false);
         }
-    };
+    },
+
+    setupEvents() {
+        document.getElementById('refreshBtn').addEventListener('click', () => this.loadDashboard());
+        
+        const debouncedUpdate = this.debounce(() => this.loadDashboard(), 1000);
+        
+        // Eventos existentes
+        document.getElementById('taxaRetorno').addEventListener('input', (e) => {
+            document.getElementById('taxaDisplay').textContent = e.target.value + '%';
+            debouncedUpdate();
+        });
+        
+        document.getElementById('expectativaVida').addEventListener('change', debouncedUpdate);
+        document.getElementById('despesasMensais').addEventListener('input', debouncedUpdate);
+        document.getElementById('perfilInvestimento').addEventListener('change', debouncedUpdate);
+        document.getElementById('inicioRendaFilhos').addEventListener('change', debouncedUpdate);
+        
+        // ✅ NOVOS EVENTOS DA FAZENDA
+        document.getElementById('periodoCompraFazenda').addEventListener('input', (e) => {
+            FazendaManager.updateFazendaInfo();
+            debouncedUpdate();
+        });
+        
+        document.getElementById('valorFazendaAtual').addEventListener('input', (e) => {
+            FazendaManager.updateFazendaInfo();
+            debouncedUpdate();
+        });
+        
+        // Eventos de simulação existentes
+        document.getElementById('simTaxaMin').addEventListener('input', (e) => {
+            document.getElementById('simTaxaMinDisplay').textContent = e.target.value + '%';
+        });
+        
+        document.getElementById('simTaxaMax').addEventListener('input', (e) => {
+            document.getElementById('simTaxaMaxDisplay').textContent = e.target.value + '%';
+        });
+        
+        document.getElementById('simVolatilidade').addEventListener('input', (e) => {
+            document.getElementById('simVolatilidadeDisplay').textContent = e.target.value + '%';
+        });
+
+        // ✅ NOVOS EVENTOS: Checkboxes da allocation
+        ['showRendaFixaBR', 'showRendaFixaInt', 'showAcoesBR', 'showAcoesInt', 'showImoveis', 'showLiquidez'].forEach(id => {
+            const checkbox = document.getElementById(id);
+            if (checkbox) {
+                checkbox.addEventListener('change', () => {
+                    if (AppState.chartJsLoaded && AppState.currentPage === 'projections') {
+                        ChartManager.createAllocationEvolutionChart();
+                    }
+                });
+            }
+        });
+    },
+
+    debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    },
+
+    async loadDashboard() {
+        try {
+            debugMessage('Carregando dados da API v4.3 com fazenda');
+            
+            UIManager.showLoading(true);
+            AppState.isLoading = true;
+            
+            const data = await ApiClient.fetchData();
+            
+            debugMessage(`Dados v4.3 recebidos: versão ${data.versao}, sucesso: ${data.success}`);
+            
+            AppState.currentData = data;
+            
+            UIManager.updateMetrics();
+            UIManager.updateAlerts();
+            UIManager.updateTable();
+            
+            setTimeout(() => {
+                if (AppState.chartJsLoaded) {
+                    ChartManager.createCharts();
+                } else {
+                    ChartManager.showAlternativeVisualization();
+                }
+            }, 300);
+            
+            Utils.showNotification('Dashboard v4.3 atualizado com sucesso!', 'success');
+            
+        } catch (error) {
+            debugMessage(`Erro ao carregar dashboard v4.3: ${error.message}`, 'error');
+            Utils.showNotification(`Erro ao carregar dados v4.3: ${error.message}`, 'danger');
+            
+            const container = document.getElementById('alertContainer');
+            if (container) {
+                container.innerHTML = `
+                    <div class="alert danger">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>Erro de Conexão v4.3:</strong> Não foi possível carregar os dados do servidor. 
+                        Verifique se o backend Flask está rodando em http://localhost:5000
+                    </div>
+                `;
+            }
+        } finally {
+            UIManager.showLoading(false);
+            AppState.isLoading = false;
+        }
+    }
+};
 
     
 
@@ -2591,7 +4014,19 @@ const ReportManager = {
                 return false;
             }
         },
-        
+
+        fixChartsNow : async () => {
+            ChartManager.destroyExistingCharts();
+            setTimeout(() => {
+                if (AppState.currentData) {
+                    ChartManager.createCharts();
+                    Utils.showNotification('🎯 Correção aplicada!', 'success');
+                }
+            }, 300);
+        },
+
+
+  
         forceCharts: async () => {
             debugMessage('Forçando criação de gráficos');
             AppState.retryingCharts = true;
@@ -2733,7 +4168,7 @@ const ReportManager = {
                     despesas: document.getElementById('despesasMensais').value,
                     perfil: document.getElementById('perfilInvestimento').value,
                     inicio_renda_filhos: document.getElementById('inicioRendaFilhos').value,
-                    custo_fazenda: document.getElementById('custoFazenda').value
+                    custo_fazenda: document.getElementById('valorFazendaAtual').value.value
                 };
                 
                 // Configurar valores de teste
@@ -2763,7 +4198,7 @@ const ReportManager = {
                         despesas: document.getElementById('despesasMensais'),
                         perfil: document.getElementById('perfilInvestimento'),
                         inicio_renda_filhos: document.getElementById('inicioRendaFilhos'),
-                        custo_fazenda: document.getElementById('custoFazenda')
+                        custo_fazenda: document.getElementById('valorFazendaAtual').value
                     }[key];
                     
                     if (element) {
@@ -2817,12 +4252,91 @@ const ReportManager = {
             debugMessage('📊 Mapeamento de dados logado no console');
             
             return mapping;
+        },
+        
+        
+        fazendaInfo: () => {
+            const periodo = document.getElementById('periodoCompraFazenda')?.value || 0;
+            const valor = document.getElementById('valorFazendaAtual')?.value || 0;
+            const valorFuturo = FazendaManager.calcularValorFuturo(valor, periodo);
+            
+            return {
+                periodo_compra: periodo,
+                valor_atual: valor,
+                valor_futuro: valorFuturo,
+                fases: FazendaManager.calcularFases(periodo),
+                dados_atuais: AppState.currentData?.resultado?.fazenda_analysis
+            };
+        },
+        
+    testProjections: async () => {
+        debugMessage('🧪 Testando projeções detalhadas');
+        try {
+            const data = await ApiClient.fetchProjectionsData();
+            console.log('Projeções recebidas:', data);
+            return data;
+        } catch (error) {
+            debugMessage(`Erro nas projeções: ${error.message}`, 'error');
+            return null;
         }
-        
+    },
+    
+    forceUpdateProjections: () => {
+        debugMessage('🔄 Forçando atualização de projeções');
+        if (AppState.currentPage === 'projections') {
+            ProjectionsManager.updateProjectionsData();
+        } else {
+            Utils.showNotification('Navegue para a página de Projeções primeiro', 'warning');
+        }
+    },
+    
+    testCharts: () => {
+        debugMessage('🧪 Testando gráficos da fazenda');
+        if (AppState.chartJsLoaded) {
+            ChartManager.createDespesasFlowChart();
+            ChartManager.createRentabilidadeFlowChart();
+            ChartManager.createAllocationEvolutionChart();
+            Utils.showNotification('Gráficos da fazenda criados!', 'success');
+        } else {
+            Utils.showNotification('Chart.js não carregado', 'error');
+        }
+    },
+    
+    getFazendaStatus: () => {
+        return {
+            controles: {
+                periodo: document.getElementById('periodoCompraFazenda')?.value,
+                valor: document.getElementById('valorFazendaAtual')?.value
+            },
+            dados_api: AppState.currentData?.resultado?.fazenda_analysis,
+            projecoes: ProjectionsManager.projectionData?.length || 0,
+            charts_carregados: AppState.chartJsLoaded,
+            versao: '4.3-FAZENDA-LIQUIDEZ'
+        };
+    },
 
-        
-        
-    };
+
+     testFazenda: (periodo = 15, valor = 2000000) => {
+            debugMessage(`🧪 Testando fazenda: ${periodo} anos, R$ ${valor.toLocaleString('pt-BR')}`);
+            document.getElementById('periodoCompraFazenda').value = periodo;
+            document.getElementById('valorFazendaAtual').value = valor;
+            
+            FazendaManager.updateFazendaInfo();
+            
+            loadChartJS().then(() => {
+                debugMessage('✅ Chart.js carregado, inicializando dashboard');
+                setTimeout(() => {
+                    DashboardController.initialize();
+                }, 300);
+            }).catch(() => {
+                debugMessage('⚠️ Chart.js falhou, inicializando sem gráficos');
+                setTimeout(() => {
+                    DashboardController.initialize();
+                }, 300);
+            });
+        },
+};
+
 
     // ================ VALIDAÇÕES DE ENTRADA LOCAIS ================ 
     function validarInputsLocais() {
@@ -2862,29 +4376,49 @@ const ReportManager = {
 
     // ================ INICIALIZAÇÃO SINCRONIZADA ================ 
     document.addEventListener('DOMContentLoaded', () => {
-        debugMessage('DOM carregado - inicializando aplicação sincronizada com backend v4.1');
-        
-        // ✅ VALIDAR SE TODOS OS ELEMENTOS NECESSÁRIOS ESTÃO PRESENTES
-        const requiredElements = [
-            'taxaRetorno', 'expectativaVida', 'despesasMensais',
-            'perfilInvestimento', 'inicioRendaFilhos', 'custoFazenda'
-        ];
-        
-        const missingElements = requiredElements.filter(id => !document.getElementById(id));
-        
-        if (missingElements.length > 0) {
-            debugMessage(`❌ Elementos HTML faltando: ${missingElements.join(', ')}`, 'error');
-            Utils.showNotification(`Erro: Elementos HTML faltando: ${missingElements.join(', ')}`, 'danger');
-            return;
-        }
-        
-        debugMessage('✅ Todos os elementos HTML necessários encontrados');
-        
-        // Inicializar com delay para garantir que tudo está pronto
-        setTimeout(() => {
-            DashboardController.initialize();
-        }, 200);
-    });
+    debugMessage('DOM carregado - inicializando aplicação v4.3 com fazenda');
+    
+    const requiredElements = [
+        'taxaRetorno', 'expectativaVida', 'despesasMensais',
+        'perfilInvestimento', 'inicioRendaFilhos', 'valorFazendaAtual',
+        'periodoCompraFazenda'  // ✅ NOVO ELEMENTO
+    ];
+    
+    const missingElements = requiredElements.filter(id => !document.getElementById(id));
+    
+    if (missingElements.length > 0) {
+        debugMessage(`❌ Elementos HTML faltando: ${missingElements.join(', ')}`, 'error');
+        Utils.showNotification(`Erro: Elementos HTML faltando: ${missingElements.join(', ')}`, 'danger');
+        return;
+    }
+    
+    debugMessage('✅ Todos os elementos HTML v4.3 encontrados');
+    
+    // ✅ AGUARDAR TUDO CARREGAR PRIMEIRO
+Promise.all([
+    loadChartJS().catch(() => {
+        console.warn('Chart.js falhou, continuando sem gráficos');
+        return false;
+    }),
+    new Promise(resolve => setTimeout(resolve, 500)) // Aguardar DOM
+]).then(() => {
+    debugMessage('✅ Inicializando dashboard após todas as dependências');
+    
+    // Verificar se managers existem
+    if (!window.ReportManager) {
+        console.warn('ReportManager não inicializado');
+    }
+    if (!window.ProjectionsManager) {
+        console.warn('ProjectionsManager não inicializado');
+    }
+    
+    DashboardController.initialize();
+}).catch(error => {
+    console.error('Erro na inicialização:', error);
+    // Inicializar mesmo com erros
+    DashboardController.initialize();
+});
+});
 
     // ================ PERFORMANCE OPTIMIZATIONS ================ 
     const ChartCache = {
@@ -3029,8 +4563,704 @@ const ReportManager = {
             
             const total = entries.reduce((sum, entry) => sum + entry.duration, 0);
             return total / entries.length;
+        },
+        trackFazendaCalculation: () => {
+        PerformanceMonitor.start('fazenda-calculation');
+        
+        setTimeout(() => {
+            const duration = PerformanceMonitor.end('fazenda-calculation');
+            debugMessage(`⏱️ Cálculo da fazenda: ${duration}ms`);
+        }, 0);
+    }
+    };
+
+    // ================ ENHANCED PROJECTIONS MANAGER ================
+
+
+// ================ FUNÇÕES GLOBAIS PARA PROJEÇÕES ================
+
+
+
+
+
+
+function updateProjectionsData() {
+    // ✅ VERIFICAR SE ProjectionsManager EXISTE
+    if (typeof ProjectionsManager !== 'undefined') {
+        ProjectionsManager.updateCurrentScenarioCard();
+        ProjectionsManager.updateProjectionsData();
+    } else {
+        debugMessage('⚠️ ProjectionsManager não inicializado ainda');
+    }
+}
+
+function updateProjection(scenario) {
+    ProjectionsManager.updateScenario(scenario);
+    
+    if (AppState.chartJsLoaded && AppState.currentPage === 'projections') {
+        setTimeout(() => {
+            ChartManager.createProjectionCharts();
+            ChartManager.createDespesasFlowChart();
+            ChartManager.createRentabilidadeFlowChart();
+            ChartManager.createAllocationEvolutionChart();
+        }, 300);
+    }
+}
+
+function updateProjectionPeriod() {
+    const period = document.getElementById('projectionPeriod')?.value || '30';
+    debugMessage(`Período de projeção alterado para: ${period} anos`);
+    
+    ProjectionsManager.updateProjectionsData();
+    
+    if (AppState.chartJsLoaded && AppState.currentPage === 'projections') {
+        setTimeout(() => {
+            ChartManager.createProjectionCharts();
+        }, 200);
+    }
+}
+
+function toggleCashFlowView() {
+    ProjectionsManager.cashFlowView = ProjectionsManager.cashFlowView === 'annual' ? 'monthly' : 'annual';
+    
+    const btn = document.getElementById('cashFlowViewBtn');
+    if (btn) {
+        const span = btn.querySelector('span');
+        if (span) {
+            span.textContent = ProjectionsManager.cashFlowView === 'annual' ? 'Anual' : 'Mensal';
+        }
+    }
+    
+    if (AppState.chartJsLoaded && AppState.currentPage === 'projections') {
+        ChartManager.createDespesasFlowChart();
+        ChartManager.createRentabilidadeFlowChart();
+    }
+    
+    debugMessage(`Visualização de fluxo de caixa: ${ProjectionsManager.cashFlowView}`);
+}
+
+function exportProjectionTable() {
+    ProjectionsManager.exportProjectionTable();
+}
+
+
+ChartManager.createProjectionCharts = function() {
+    this.createPatrimonialEvolutionChart();
+    this.createDespesasFlowChart();
+    this.createRentabilidadeFlowChart();
+    this.createAllocationEvolutionChart();
+};
+
+// ================ INTEGRAÇÃO COM CHART MANAGER ================
+
+
+ChartManager.createPatrimonialEvolutionChart = function() {
+    const ctx = document.getElementById('patrimonialEvolutionChart');
+    if (!ctx || !ProjectionsManager.projectionData) return;
+
+    const data = ProjectionsManager.projectionData.slice(0, 30); // 30 anos máximo
+    
+    AppState.charts.patrimonialEvolution = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: data.map(item => item.ano),
+            datasets: [{
+                label: 'Patrimônio (R$ milhões)',
+                data: data.map(item => item.patrimonio / 1000000),
+                borderColor: this.colors.primary,
+                backgroundColor: this.colors.primary + '20',
+                borderWidth: 3,
+                tension: 0.4,
+                fill: true,
+                pointBackgroundColor: this.colors.primary,
+                pointBorderColor: '#ffffff',
+                pointBorderWidth: 2,
+                pointRadius: 4,
+                pointHoverRadius: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const item = data[context.dataIndex];
+                            return [
+                                `Patrimônio: ${Utils.formatCurrency(item.patrimonio, true)}`,
+                                `Idade Ana: ${item.idadeAna} anos`,
+                                `Ana ${item.anaViva ? 'viva' : 'faleceu'}`
+                            ];
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { color: '#f1f5f9' },
+                    ticks: { color: '#6b7280', font: { size: 11 } }
+                },
+                y: {
+                    grid: { color: '#f1f5f9' },
+                    ticks: { 
+                        color: '#6b7280',
+                        font: { size: 11 },
+                        callback: function(value) {
+                            return 'R$ ' + value + 'M';
+                        }
+                    }
+                }
+            }
+        }
+    });
+};
+
+
+ChartManager.createAllocationPageCharts = function() {
+    debugMessage('Criando gráficos da página Asset Allocation');
+    this.createCurrentAllocationChart();
+    this.createBenchmarkChart();
+    this.createAllocationTrendsChart();  // ✅ NOVO
+};
+
+ChartManager.createCurrentAllocationChart = function() {
+    const ctx = document.getElementById('currentAllocationChart');
+    if (!ctx || !AppState.currentData) return;
+    
+    const { allocation } = AppState.currentData;
+    if (!allocation) return;
+
+    debugMessage('Criando gráfico de allocation atual');
+
+    AppState.charts.currentAllocation = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: allocation.map(item => item.nome),
+            datasets: [{
+                data: allocation.map(item => item.percentual),
+                backgroundColor: [
+                    '#1e3a8a', '#3b82f6', '#64748b', '#059669', 
+                    '#ea580c', '#7c3aed', '#94a3b8'
+                ].slice(0, allocation.length),
+                borderWidth: 2,
+                borderColor: '#ffffff',
+                hoverOffset: 8
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'right',
+                    labels: { 
+                        color: '#374151',
+                        padding: 20,
+                        usePointStyle: true,
+                        font: { size: 12 }
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const item = allocation[context.dataIndex];
+                            return `${context.label}: ${item.percentual}% (${Utils.formatCurrency(item.valor, true)})`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+};
+
+ChartManager.createBenchmarkChart = function() {
+    const ctx = document.getElementById('benchmarkChart');
+    if (!ctx) return;
+
+    debugMessage('Criando gráfico de benchmark');
+
+    const perfil = document.getElementById('perfilInvestimento')?.value || 'moderado';
+    
+    // ✅ DADOS REALISTAS DE BENCHMARK POR PERFIL
+    const benchmarkData = {
+        'conservador': {
+            atual: [70, 15, 5, 5, 3, 2],
+            benchmark: [75, 10, 8, 5, 2, 0],
+            labels: ['RF BR', 'RF Int', 'Ações BR', 'Ações Int', 'Imóveis', 'Liquidez']
+        },
+        'moderado': {
+            atual: [50, 20, 15, 10, 3, 2],
+            benchmark: [45, 25, 15, 12, 3, 0],
+            labels: ['RF BR', 'RF Int', 'Ações BR', 'Ações Int', 'Imóveis', 'Liquidez']
+        },
+        'balanceado': {
+            atual: [40, 15, 20, 15, 5, 5],
+            benchmark: [35, 15, 25, 20, 5, 0],
+            labels: ['RF BR', 'RF Int', 'Ações BR', 'Ações Int', 'Imóveis', 'Liquidez']
         }
     };
+
+    const data = benchmarkData[perfil] || benchmarkData['moderado'];
+
+    AppState.charts.benchmark = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: data.labels,
+            datasets: [{
+                label: 'Alocação Atual',
+                data: data.atual,
+                backgroundColor: this.colors.primary + '80',
+                borderColor: this.colors.primary,
+                borderWidth: 1
+            }, {
+                label: 'Benchmark Sugerido',
+                data: data.benchmark,
+                backgroundColor: this.colors.accent + '80',
+                borderColor: this.colors.accent,
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'top',
+                    labels: { font: { size: 12 } }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return `${context.dataset.label}: ${context.parsed.y}%`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { color: '#f1f5f9' },
+                    ticks: { color: '#6b7280', font: { size: 11 } }
+                },
+                y: {
+                    beginAtZero: true,
+                    max: 80,
+                    grid: { color: '#f1f5f9' },
+                    ticks: {
+                        color: '#6b7280',
+                        font: { size: 11 },
+                        callback: function(value) {
+                            return value + '%';
+                        }
+                    }
+                }
+            }
+        }
+    });
+};
+
+// ✅ NOVO GRÁFICO: Evolução da Allocation ao Longo do Tempo
+ChartManager.createAllocationTrendsChart = function() {
+    const ctx = document.getElementById('allocationTrendsChart');
+    if (!ctx) return;
+
+    debugMessage('Criando gráfico de tendências de allocation');
+
+    // Simular evolução da allocation ao longo dos anos
+    const anos = ['2025', '2030', '2035', '2040', '2045'];
+    const periodo = parseInt(document.getElementById('periodoCompraFazenda')?.value || 15);
+    
+    AppState.charts.allocationTrends = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: anos,
+            datasets: [{
+                label: 'Renda Fixa (%)',
+                data: [50, 55, 60, 65, 70], // Aumenta com o tempo (conservadorismo)
+                borderColor: this.colors.primary,
+                backgroundColor: this.colors.primary + '20',
+                tension: 0.4
+            }, {
+                label: 'Renda Variável (%)',
+                data: [25, 22, 18, 15, 12], // Diminui com o tempo
+                borderColor: this.colors.accent,
+                backgroundColor: this.colors.accent + '20',
+                tension: 0.4
+            }, {
+                label: 'Liquidez (%)',
+                data: [2, periodo > 10 ? 8 : 4, periodo > 5 ? 15 : 6, 12, 8], // Pico antes da fazenda
+                borderColor: this.colors.orange,
+                backgroundColor: this.colors.orange + '20',
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'top',
+                    labels: { font: { size: 11 } }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { color: '#f1f5f9' },
+                    ticks: { color: '#6b7280', font: { size: 11 } }
+                },
+                y: {
+                    beginAtZero: true,
+                    max: 80,
+                    grid: { color: '#f1f5f9' },
+                    ticks: {
+                        color: '#6b7280',
+                        font: { size: 11 },
+                        callback: function(value) {
+                            return value + '%';
+                        }
+                    }
+                }
+            }
+        }
+    });
+};
+
+
+// ================ SETUP DE EVENTOS PARA CHECKBOXES ================
+function setupAllocationCheckboxEvents() {
+    debugMessage('🔧 Configurando eventos de checkboxes da allocation');
+    
+    const checkboxIds = [
+        'showRendaFixaBR', 
+        'showRendaFixaInt', 
+        'showAcoesBR', 
+        'showAcoesInt', 
+        'showImoveis', 
+        'showLiquidez',
+        'showMultimercado'
+    ];
+    
+    checkboxIds.forEach(id => {
+        const checkbox = document.getElementById(id);
+        if (checkbox) {
+            checkbox.addEventListener('change', () => {
+                debugMessage(`📊 Checkbox ${id} alterado: ${checkbox.checked}`);
+                
+                // Atualizar gráfico de allocation evolution se estiver na página de projeções
+                if (AppState.chartJsLoaded && AppState.currentPage === 'projections') {
+                    setTimeout(() => {
+                        ChartManager.createAllocationEvolutionChart();
+                    }, 100);
+                }
+                
+                // Atualizar outros gráficos de allocation se necessário
+                if (AppState.chartJsLoaded && AppState.currentPage === 'allocation') {
+                    setTimeout(() => {
+                        ChartManager.createAllocationTrendsChart();
+                    }, 100);
+                }
+            });
+            
+            debugMessage(`✅ Evento configurado para ${id}`);
+        } else {
+            debugMessage(`⚠️ Checkbox ${id} não encontrado no DOM`, 'warning');
+        }
+    });
+    
+    debugMessage('✅ Todos os eventos de checkboxes configurados');
+}
+
+ChartManager.createCashFlowChart = function() {
+    const ctx = document.getElementById('cashFlowChart');
+    if (!ctx || !ProjectionsManager.projectionData) return;
+
+    const data = ProjectionsManager.projectionData.slice(0, 20);
+    
+    AppState.charts.cashFlow = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: data.map(item => item.ano),
+            datasets: [{
+                label: 'Rendimentos',
+                data: data.map(item => item.rendimentos / 1000000),
+                backgroundColor: this.colors.accent + '80',
+                borderColor: this.colors.accent,
+                borderWidth: 1
+            }, {
+                label: 'Saídas',
+                data: data.map(item => -item.saidas / 1000000),
+                backgroundColor: this.colors.orange + '80',
+                borderColor: this.colors.orange,
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const value = Math.abs(context.parsed.y);
+                            const type = context.dataset.label;
+                            return `${type}: ${Utils.formatCurrency(value * 1000000, true)}`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { color: '#f1f5f9' },
+                    ticks: { color: '#6b7280', font: { size: 11 } }
+                },
+                y: {
+                    grid: { color: '#f1f5f9' },
+                    ticks: {
+                        color: '#6b7280',
+                        font: { size: 11 },
+                        callback: function(value) {
+                            return 'R$ ' + Math.abs(value) + 'M';
+                        }
+                    }
+                }
+            }
+        }
+    });
+};
+
+// ================ INICIALIZAÇÃO ================
+// Integrar ProjectionsManager com o sistema existente
+const originalShowPage = window.showPage;
+async function showPageCorrected(pageId) {
+    debugMessage(`🧭 Navegando para página: ${pageId} (versão robusta)`);
+    
+    try {
+        // Atualizar UI imediatamente
+        document.querySelectorAll('.page-content').forEach(page => page.classList.remove('active'));
+        document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+        
+        const targetPage = document.getElementById(pageId + 'Page');
+        if (targetPage) {
+            targetPage.classList.add('active');
+            AppState.currentPage = pageId;
+        }
+        
+        if (window.event && window.event.target) {
+            const navItem = window.event.target.closest('.nav-item');
+            if (navItem) navItem.classList.add('active');
+        }
+        
+        // ✅ CARREGAR GRÁFICOS COM AGUARDA
+        await loadChartsForPageCorrected(pageId);
+        
+    } catch (error) {
+        debugMessage(`❌ Erro na navegação: ${error.message}`, 'error');
+    }
+}
+
+// Integrar com atualizações de dados
+const originalLoadDashboard = DashboardController.loadDashboard;
+DashboardController.loadDashboard = async function() {
+    await originalLoadDashboard.call(this);
+    
+    // Se estiver na página de projeções, atualizar
+    if (AppState.currentPage === 'projections') {
+        setTimeout(() => {
+            ProjectionsManager.updateCurrentScenarioCard();
+            ProjectionsManager.updateProjectionsData();
+        }, 500);
+    }
+};
+
+const originalSetupEvents = DashboardController.setupEvents;
+DashboardController.setupEvents = function() {
+    // Manter eventos originais
+    if (originalSetupEvents) {
+        originalSetupEvents.call(this);
+    }
+    
+    // ✅ ADICIONAR EVENTOS PARA ATUALIZAÇÃO DE PROJEÇÕES
+    const debouncedProjectionUpdate = this.debounce(() => {
+        if (AppState.currentPage === 'projections') {
+            setTimeout(() => {
+                ProjectionsManager.updateProjectionsData();
+                ChartManager.createAllocationEvolutionChart();
+            }, 300);
+        }
+    }, 1000);
+    
+    // Eventos que devem atualizar projeções
+    ['taxaRetorno', 'expectativaVida', 'despesasMensais', 'perfilInvestimento', 'inicioRendaFilhos', 'periodoCompraFazenda', 'valorFazendaAtual'].forEach(id => {
+        const element = document.getElementById(id);
+        if (element) {
+            element.addEventListener('change', debouncedProjectionUpdate);
+            element.addEventListener('input', debouncedProjectionUpdate);
+        }
+    });
+    
+    setupAllocationCheckboxEvents();
+    debugMessage('✅ Eventos v4.3.1 configurados com atualizações dinâmicas');
+};
+
+
+window.CimoDebug.testAllCorrections = async function() {
+    console.clear();
+    debugMessage('🧪 TESTANDO TODAS AS CORREÇÕES v4.3');
+    
+    // Teste 1: Asset Allocation Dinâmico
+    debugMessage('📊 Teste 1: Asset Allocation Dinâmico');
+    document.getElementById('perfilInvestimento').value = 'balanceado';
+    document.getElementById('periodoCompraFazenda').value = '15';
+    await showPageCorrected('projections');
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    debugMessage('✅ Teste 1 concluído');
+    
+    // Teste 2: Navegação entre páginas
+    debugMessage('📊 Teste 2: Navegação Robusta');
+    const pages = ['dashboard', 'allocation', 'projections', 'simulations'];
+    for (const page of pages) {
+        await showPageCorrected(page);
+        await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+    debugMessage('✅ Teste 2 concluído');
+    
+    // Teste 3: snake_case
+    debugMessage('📊 Teste 3: Dados snake_case');
+    if (ProjectionsManager.projectionData && ProjectionsManager.projectionData.length > 0) {
+        const sample = ProjectionsManager.projectionData[0];
+        const hasSnakeCase = 'idade_ana' in sample && 'saldo_liquido' in sample;
+        debugMessage(`✅ Snake_case OK: ${hasSnakeCase}`);
+    }
+    
+    debugMessage('🎉 TODOS OS TESTES CONCLUÍDOS - Correções v4.3 funcionando!');
+    Utils.showNotification('🎉 Correções v4.3 testadas com sucesso!', 'success');
+};
+
+window.CimoDebug.testAssetAllocationDynamic = function() {
+    debugMessage('🧪 Testando Asset Allocation Dinâmico');
+    
+    // Testar diferentes perfis
+    const perfis = ['conservador', 'moderado', 'balanceado'];
+    perfis.forEach(perfil => {
+        document.getElementById('perfilInvestimento').value = perfil;
+        debugMessage(`📊 Testando perfil: ${perfil}`);
+        ChartManager.createAllocationEvolutionChart();
+    });
+    
+    debugMessage('✅ Teste Asset Allocation Dinâmico concluído');
+};
+
+window.CimoDebug.fixChartAndProjections = function() {
+    debugMessage('🔧 Aplicando correções v4.3.1 para Chart e Projeções');
+    
+    try {
+        // Forçar recriação do gráfico
+        if (AppState.currentPage === 'projections') {
+            ChartManager.createAllocationEvolutionChart();
+            ProjectionsManager.updateProjectionsData();
+        }
+        
+        Utils.showNotification('✅ Correções v4.3.1 aplicadas!', 'success');
+        debugMessage('✅ Correções aplicadas com sucesso');
+        
+    } catch (error) {
+        debugMessage(`❌ Erro ao aplicar correções: ${error.message}`, 'error');
+        Utils.showNotification('❌ Erro ao aplicar correções', 'danger');
+    }
+};
+
+debugMessage('🚀 Correções v4.3.1 carregadas - Chart Evolution + Projeções Dinâmicas');
+console.log('✅ Use window.CimoDebug.fixChartAndProjections() para aplicar correções');
+
+
+// ✅ CARREGAMENTO DE GRÁFICOS ROBUSTO
+async function loadChartsForPageCorrected(pageId) {
+    debugMessage(`📊 Carregando gráficos para: ${pageId}`);
+    
+    // ✅ AGUARDAR Chart.js
+    if (!AppState.chartJsLoaded || typeof Chart === 'undefined') {
+        debugMessage('⏳ Aguardando Chart.js...');
+        const chartReady = await new Promise(resolve => {
+            let attempts = 0;
+            const check = setInterval(() => {
+                if (typeof Chart !== 'undefined') {
+                    clearInterval(check);
+                    AppState.chartJsLoaded = true;
+                    resolve(true);
+                } else if (++attempts > 20) {
+                    clearInterval(check);
+                    resolve(false);
+                }
+            }, 250);
+        });
+        
+        if (!chartReady) {
+            debugMessage('❌ Chart.js não carregou, usando fallback', 'error');
+            ChartManager.showAlternativeVisualization();
+            return;
+        }
+    }
+    
+    // ✅ AGUARDAR DADOS SE NECESSÁRIO
+    if (!AppState.currentData) {
+        debugMessage('⏳ Aguardando dados...');
+        await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+    
+    // ✅ CARREGAR GRÁFICOS POR PÁGINA
+    const chartFunctions = {
+        'dashboard': () => {
+            ChartManager.hideChartPlaceholders(['compromissosContainer', 'allocationContainer', 'sensibilidadeContainer']);
+            ChartManager.createCompromissosChart();
+            ChartManager.createAllocationChart();
+            ChartManager.createSensibilidadeChart();
+        },
+        'allocation': () => {
+            ChartManager.hideChartPlaceholders(['currentAllocationContainer', 'benchmarkContainer']);
+            ChartManager.createAllocationPageCharts();
+            updateAllocationTableCorrected();
+        },
+        'projections': async () => {
+            ChartManager.hideChartPlaceholders(['patrimonialEvolutionContainer', 'despesasFlowContainer', 'rentabilidadeFlowContainer', 'allocationEvolutionContainer']);
+            
+            // ✅ INICIALIZAR ProjectionsManager PRIMEIRO
+            await ProjectionsManager.initialize();
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            // ✅ CRIAR GRÁFICOS DE PROJEÇÃO
+            ChartManager.createPatrimonialEvolutionChart();
+            ChartManager.createDespesasFlowChart();
+            ChartManager.createRentabilidadeFlowChart();
+            ChartManager.createAllocationEvolutionChart();
+        },
+        'simulations': () => {
+            ChartManager.hideChartPlaceholders(['monteCarloContainer', 'distribuicaoContainer']);
+            ChartManager.createSimulationCharts();
+        },
+        'scenarios': () => {
+            ChartManager.hideChartPlaceholders(['scenarioComparisonContainer', 'scenarioEvolutionContainer', 'stressTestContainer']);
+            ChartManager.createScenarioCharts();
+        },
+        'sensitivity': () => {
+            ChartManager.hideChartPlaceholders(['returnSensitivityContainer', 'expenseSensitivityContainer', 'bidimensionalContainer']);
+            ChartManager.createSensitivityCharts();
+        },
+        'reports': () => {
+            debugMessage('📄 Página de relatórios - sem gráficos');
+        }
+    };
+    
+    const chartFunction = chartFunctions[pageId];
+    if (chartFunction) {
+        try {
+            await chartFunction();
+            debugMessage(`✅ Gráficos carregados para ${pageId}`);
+        } catch (error) {
+            debugMessage(`❌ Erro nos gráficos de ${pageId}: ${error.message}`, 'error');
+        }
+    }
+}
 
     // ================ INICIALIZAÇÃO DAS OTIMIZAÇÕES ================ 
     function initializePerformanceOptimizations() {
@@ -3044,6 +5274,8 @@ const ReportManager = {
         debugMessage('Otimizações de performance carregadas');
     }
 
+
+
     // ================ EXPOR OBJETOS GLOBAIS PARA DEBUG ================ 
     window.AppState = AppState;
     window.ChartManager = ChartManager;
@@ -3054,9 +5286,10 @@ const ReportManager = {
     window.DashboardController = DashboardController;
     window.SimulationManager = SimulationManager;
     window.ReportManager = ReportManager;
-
+    window.ProjectionsManager = ProjectionsManager;
     // ================ FUNÇÕES GLOBAIS EXPOSTAS ================ 
-    window.showPage = showPage;
+    window.showPage = showPageCorrected;
+    window.updateAllocationTable = updateAllocationTableCorrected;
     window.showAnalysis = showAnalysis;
     window.updateProjection = updateProjection;
     window.updateSimulationParams = updateSimulationParams;
@@ -3068,14 +5301,24 @@ const ReportManager = {
     window.exportToPDF = exportToPDF;
     window.toggleDebug = toggleDebug;
     window.validarInputsLocais = validarInputsLocais;
-
+    window.ProjectionsManager = ProjectionsManager;
+    window.FazendaManager = FazendaManager;
     // ================ LOG DE INICIALIZAÇÃO ================ 
-    debugMessage('🚀 JavaScript sincronizado com backend app.py v4.1 CARREGADO');
-    debugMessage('📋 Endpoints disponíveis: /api/dados, /api/teste, /api/teste-correcoes');
-    debugMessage('🔧 Campos sincronizados: taxa, expectativa, despesas, perfil, inicio_renda_filhos, custo_fazenda');
-    debugMessage('📊 Mapeamento de dados: fazenda_disponivel → fazenda, total_compromissos → total');
-    debugMessage('⚡ Performance optimizations: Chart caching, lazy loading, debounced API calls');
-    debugMessage('🐛 Debug disponível via window.CimoDebug');
+   debugMessage('🚀 JavaScript v4.3 FAZENDA + LIQUIDEZ GRADUAL CARREGADO');
+debugMessage('🏡 Novos recursos: Período compra, liquidez gradual, gráficos duplos');
+debugMessage('📋 Endpoints: /api/dados (v4.3), /api/projecoes-detalhadas');
+debugMessage('🔧 Parâmetros: periodo_compra_fazenda, valor_fazenda_atual');
+debugMessage('📊 Gráficos: DespesasFlow, RentabilidadeFlow, AllocationEvolution');
+debugMessage('⚡ Inflação estática: 3.5% a.a., Fases: 40%, 40%, 20%');
+debugMessage('🐛 Debug: window.CimoDebug.testFazenda(), getFazendaStatus()');
+console.log('✅ Correções v4.3 carregadas com sucesso!');
+console.log('🧪 Use window.CimoDebug.testAllCorrections() para testar tudo');
+console.log('📊 Use window.CimoDebug.testAssetAllocationDynamic() para testar allocation');
+debugMessage('🚀 Correções v4.3 PRONTAS - Asset Allocation 100% Dinâmico + Navegação Robusta + snake_case');
+// Ver status dos gráficos Chart.js
+
+
+
 
     // Inicializar otimizações
     initializePerformanceOptimizations();

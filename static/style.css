@@ -1673,3 +1673,586 @@ transition: width 0.3s ease;
     border-radius: 50%;
     animation: spin 1s linear infinite;
 }
+
+/* ================ ESTILOS PARA PÁGINA DE PROJEÇÕES MELHORADA ================ */
+
+/* Barra de Status da Projeção */
+.projection-status-bar {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+    padding: 20px;
+    background: linear-gradient(135deg, var(--white), var(--gray-50));
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+}
+
+.status-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background: var(--white);
+    border-radius: 8px;
+    border: 1px solid var(--border-light);
+    transition: var(--transition);
+}
+
+.status-item:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.status-icon {
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(135deg, var(--primary), var(--primary-light));
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--white);
+    font-size: 1.1rem;
+}
+
+.status-content {
+    display: flex;
+    flex-direction: column;
+}
+
+.status-label {
+    font-size: 0.8rem;
+    color: var(--gray-600);
+    font-weight: 500;
+    margin-bottom: 2px;
+}
+
+.status-value {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--gray-900);
+}
+
+/* Controles de Projeção */
+.projection-control {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 0.875rem;
+    color: var(--gray-700);
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.projection-control:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(30, 58, 138, 0.1);
+}
+
+/* Resumo de Projeções Melhorado */
+.projection-summary {
+    background: linear-gradient(135deg, var(--primary), var(--primary-light));
+    color: var(--white);
+    border-radius: 16px;
+    padding: 28px;
+    box-shadow: var(--shadow-lg);
+    position: relative;
+    overflow: hidden;
+}
+
+.projection-summary::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -50%;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+    pointer-events: none;
+}
+
+.projection-summary h3 {
+    font-size: 1.4rem;
+    margin-bottom: 20px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.projection-metric {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    position: relative;
+}
+
+.projection-metric:last-child {
+    border-bottom: none;
+}
+
+.projection-metric.highlight {
+    background: rgba(255, 255, 255, 0.1);
+    margin: 8px -16px;
+    padding: 16px;
+    border-radius: 8px;
+    border-bottom: none;
+}
+
+.projection-metric .metric-trend {
+    margin-left: 8px;
+    opacity: 0.8;
+    font-size: 0.9rem;
+}
+
+/* Cards de Cenário Melhorados */
+.scenario-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+    margin: 24px 0;
+}
+
+.scenario-card {
+    background: var(--white);
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    transition: var(--transition);
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+}
+
+.scenario-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 4px;
+    background: linear-gradient(90deg, var(--gray-300), var(--gray-400));
+    transition: var(--transition);
+}
+
+.scenario-card.current::before {
+    background: linear-gradient(90deg, var(--accent), #10b981);
+}
+
+.scenario-card:hover {
+    border-color: var(--primary);
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-lg);
+}
+
+.scenario-card:hover::before {
+    background: linear-gradient(90deg, var(--primary), var(--primary-light));
+}
+
+.scenario-card.active {
+    border-color: var(--primary);
+    background: rgba(30, 58, 138, 0.05);
+    transform: translateY(-2px);
+}
+
+.scenario-card.active::before {
+    background: linear-gradient(90deg, var(--primary), var(--primary-light));
+}
+
+.scenario-card.current {
+    border-color: var(--accent);
+    background: rgba(5, 150, 105, 0.05);
+}
+
+.scenario-card h4 {
+    color: var(--gray-900);
+    font-weight: 700;
+    margin-bottom: 8px;
+    font-size: 1rem;
+}
+
+.scenario-card .value {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: var(--primary);
+    margin-bottom: 4px;
+}
+
+.scenario-card.current .value {
+    color: var(--accent);
+}
+
+.scenario-card .change {
+    font-size: 0.8rem;
+    color: var(--gray-500);
+    margin-bottom: 8px;
+}
+
+.scenario-detail {
+    font-size: 0.75rem;
+    color: var(--gray-600);
+    font-style: italic;
+    margin-top: 8px;
+}
+
+/* Marcos Temporais */
+.milestones-section {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+    margin: 24px 0;
+    box-shadow: var(--shadow);
+}
+
+.milestones-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 16px;
+    margin-top: 16px;
+}
+
+.milestone-card {
+    background: var(--gray-50);
+    border: 1px solid var(--border-light);
+    border-radius: 10px;
+    padding: 16px;
+    position: relative;
+    transition: var(--transition);
+}
+
+.milestone-card:hover {
+    background: var(--white);
+    box-shadow: var(--shadow-md);
+}
+
+.milestone-date {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--primary);
+    margin-bottom: 4px;
+}
+
+.milestone-event {
+    font-size: 0.9rem;
+    color: var(--gray-900);
+    margin-bottom: 8px;
+    font-weight: 600;
+}
+
+.milestone-description {
+    font-size: 0.8rem;
+    color: var(--gray-600);
+    line-height: 1.4;
+}
+
+.milestone-impact {
+    display: inline-block;
+    background: rgba(30, 58, 138, 0.1);
+    color: var(--primary);
+    font-size: 0.75rem;
+    padding: 2px 8px;
+    border-radius: 12px;
+    margin-top: 8px;
+    font-weight: 500;
+}
+
+/* Responsividade para Projeções */
+@media (max-width: 1024px) {
+    .projection-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .scenario-cards {
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    }
+    
+    .projection-status-bar {
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 12px;
+        padding: 16px;
+    }
+}
+
+@media (max-width: 768px) {
+    .scenario-cards {
+        grid-template-columns: 1fr 1fr;
+    }
+    
+    .status-item {
+        flex-direction: column;
+        text-align: center;
+        gap: 8px;
+    }
+    
+    .status-icon {
+        margin: 0 auto;
+    }
+    
+    .milestones-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 480px) {
+    .scenario-cards {
+        grid-template-columns: 1fr;
+    }
+    
+    .projection-status-bar {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Estados de Loading Melhorados */
+.projection-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    color: var(--primary);
+    font-weight: 500;
+}
+
+.projection-loading i {
+    animation: spin 1s linear infinite;
+}
+
+/* Tooltips para Métricas */
+.metric-tooltip {
+    position: relative;
+    cursor: help;
+}
+
+.metric-tooltip:hover::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--gray-900);
+    color: var(--white);
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    white-space: nowrap;
+    z-index: 1000;
+    margin-bottom: 4px;
+}
+
+.metric-tooltip:hover::before {
+    content: '';
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 4px solid transparent;
+    border-top-color: var(--gray-900);
+}
+
+/* Animações de Entrada */
+.projection-fade-in {
+    animation: projectionFadeIn 0.6s ease-out;
+}
+
+@keyframes projectionFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Estados de Valor (Positivo/Negativo) */
+.value-positive {
+    color: var(--accent) !important;
+}
+
+.value-negative {
+    color: #dc2626 !important;
+}
+
+.value-warning {
+    color: var(--accent-orange) !important;
+}
+
+/* Indicadores de Tendência */
+.trend-up::before {
+    content: "↗";
+    color: var(--accent);
+    margin-right: 4px;
+}
+
+.trend-down::before {
+    content: "↘";
+    color: #dc2626;
+    margin-right: 4px;
+}
+
+.trend-stable::before {
+    content: "→";
+    color: var(--gray-500);
+    margin-right: 4px;
+}
+
+/* Destaque para Card Atual */
+.scenario-card.current {
+    position: relative;
+}
+
+.scenario-card.current::after {
+    content: "ATIVO";
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: var(--accent);
+    color: var(--white);
+    font-size: 0.6rem;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 10px;
+    letter-spacing: 0.5px;
+}
+
+/* Controles da fazenda */
+.control-help {
+    color: var(--gray-500);
+    font-size: 0.75rem;
+    margin-top: 4px;
+    font-style: italic;
+}
+
+.fazenda-card {
+    border-left: 4px solid var(--accent);
+}
+
+.fazenda-details {
+    font-size: 0.85rem;
+}
+
+.fazenda-comparison {
+    background: var(--gray-50);
+    padding: 8px;
+    border-radius: 6px;
+}
+
+.fazenda-timeline {
+    display: flex;
+    gap: 16px;
+    padding: 16px;
+    background: var(--gray-50);
+    border-radius: 12px;
+    overflow-x: auto;
+}
+
+.timeline-phase {
+    min-width: 200px;
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    text-align: center;
+    position: relative;
+}
+
+.timeline-phase.active {
+    border-color: var(--accent);
+    background: rgba(5, 150, 105, 0.05);
+}
+
+.phase-title {
+    font-weight: 700;
+    color: var(--gray-900);
+    margin-bottom: 8px;
+}
+
+.phase-period {
+    color: var(--gray-600);
+    font-size: 0.8rem;
+    margin-bottom: 4px;
+}
+
+.phase-liquidez {
+    color: var(--accent);
+    font-weight: 600;
+    font-size: 1.1rem;
+}
+
+/* Cash flow charts ajustados */
+.cash-flow-charts .charts-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+/* Checkboxes da allocation */
+.allocation-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+}
+
+.allocation-checkbox input[type="checkbox"] {
+    width: 14px;
+    height: 14px;
+    accent-color: var(--primary);
+}
+
+.allocation-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+    .cash-flow-charts .charts-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .fazenda-timeline {
+        flex-direction: column;
+    }
+    
+    .allocation-controls {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+}
+
+/* Estados de validação */
+.control-group.error input {
+    border-color: #dc2626;
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
+}
+
+.control-group.success input {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.1);
+}
+
+/* Loading states */
+.fazenda-loading {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--gray-500);
+    font-size: 0.8rem;
+}
+
+.fazenda-loading i {
+    animation: spin 1s linear infinite;
+}

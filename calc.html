@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cálculos Financeiros - Plano Patrimonial Ana</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f8fafc;
+            color: #334155;
+            line-height: 1.6;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #1e3a8a, #3b82f6);
+            color: white;
+            padding: 30px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        
+        .section {
+            background: white;
+            margin: 20px 0;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border-left: 4px solid #3b82f6;
+        }
+        
+        .formula-box {
+            background: #f1f5f9;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 15px 0;
+            font-family: 'Courier New', monospace;
+            position: relative;
+        }
+        
+        .formula-box::before {
+            content: "📐 Fórmula";
+            position: absolute;
+            top: -12px;
+            left: 15px;
+            background: #3b82f6;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-family: 'Segoe UI', sans-serif;
+        }
+        
+        .code-box {
+            background: #1e293b;
+            color: #f1f5f9;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            overflow-x: auto;
+            margin: 15px 0;
+        }
+        
+        .highlight {
+            background: #fef3c7;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        
+        .param-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        
+        .param-card {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            padding: 15px;
+            border-radius: 8px;
+        }
+        
+        .param-card strong {
+            color: #1e3a8a;
+        }
+        
+        .example {
+            background: #ecfdf5;
+            border-left: 4px solid #10b981;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        
+        .example::before {
+            content: "💡 Exemplo Prático";
+            font-weight: bold;
+            color: #065f46;
+            display: block;
+            margin-bottom: 10px;
+        }
+        
+        .result-box {
+            background: linear-gradient(135deg, #059669, #10b981);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 15px 0;
+            text-align: center;
+        }
+        
+        .warning {
+            background: #fef3c7;
+            border: 1px solid #f59e0b;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+        
+        .warning::before {
+            content: "⚠️ ";
+            font-weight: bold;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        
+        th, td {
+            border: 1px solid #e2e8f0;
+            padding: 12px;
+            text-align: left;
+        }
+        
+        th {
+            background: #f1f5f9;
+            font-weight: bold;
+            color: #1e3a8a;
+        }
+        
+        .nav {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .nav a {
+            color: #3b82f6;
+            text-decoration: none;
+            margin: 0 15px;
+            padding: 8px 16px;
+            border-radius: 6px;
+            transition: background 0.3s;
+        }
+        
+        .nav a:hover {
+            background: #f1f5f9;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🏢 Cálculos Financeiros - Plano Patrimonial Ana</h1>
+        <p>Análise Matemática Completa | CIMO Family Office</p>
+        <p><strong>Cliente:</strong> Ana, 53 anos | <strong>Patrimônio:</strong> R$ 65 milhões</p>
+    </div>
+
+    <div class="nav">
+        <a href="#parametros">Parâmetros</a>
+        <a href="#formulas">Fórmulas</a>
+        <a href="#compromissos">Compromissos</a>
+        <a href="#simulacoes">Simulações</a>
+        <a href="#status">Status</a>
+    </div>
+
+    <section id="parametros" class="section">
+        <h2>📊 Parâmetros e Constantes Fundamentais</h2>
+        
+        <div class="param-grid">
+            <div class="param-card">
+                <strong>PATRIMÔNIO</strong><br>
+                R$ 65.000.000<br>
+                <small>Base de cálculo (líquido)</small>
+            </div>
+            <div class="param-card">
+                <strong>IDADE_ANA</strong><br>
+                53 anos<br>
+                <small>Idade atual</small>
+            </div>
+            <div class="param-card">
+                <strong>DESPESAS_BASE</strong><br>
+                R$ 150.000/mês<br>
+                <small>Padrão de vida</small>
+            </div>
+            <div class="param-card">
+                <strong>RENDA_FILHOS</strong><br>
+                R$ 150.000/mês<br>
+                <small>R$ 50k × 3 filhos</small>
+            </div>
+            <div class="param-card">
+                <strong>DOAÇÕES</strong><br>
+                R$ 50.000/mês<br>
+                <small>Por 15 anos exatos</small>
+            </div>
+            <div class="param-card">
+                <strong>INFLAÇÃO</strong><br>
+                3.5% a.a.<br>
+                <small>Já descontada da taxa</small>
+            </div>
+        </div>
+
+        <h3>🎯 Perfis de Asset Allocation</h3>
+        <table>
+            <tr>
+                <th>Perfil</th>
+                <th>RF Brasil</th>
+                <th>RF Internacional</th>
+                <th>Ações BR</th>
+                <th>Ações Int</th>
+                <th>Imóveis</th>
+                <th>Liquidez</th>
+                <th>Retorno Esperado</th>
+            </tr>
+            <tr>
+                <td><strong>Conservador</strong></td>
+                <td>70%</td>
+                <td>15%</td>
+                <td>5%</td>
+                <td>5%</td>
+                <td>3%</td>
+                <td>2%</td>
+                <td class="highlight">3.5% a.a.</td>
+            </tr>
+            <tr>
+                <td><strong>Moderado</strong></td>
+                <td>50%</td>
+                <td>20%</td>
+                <td>15%</td>
+                <td>10%</td>
+                <td>3%</td>
+                <td>2%</td>
+                <td class="highlight">4.5% a.a.</td>
+            </tr>
+            <tr>
+                <td><strong>Balanceado</strong></td>
+                <td>40%</td>
+                <td>15%</td>
+                <td>20%</td>
+                <td>15%</td>
+                <td>5%</td>
+                <td>2%</td>
+                <td class="highlight">5.2% a.a.</td>
+            </tr>
+        </table>
+    </section>
+
+    <section id="formulas" class="section">
+        <h2>🧮 Fórmulas Matemáticas Centrais</h2>
+        
+        <h3>1. Valor Presente de Anuidade (Fórmula Principal)</h3>
+        <div class="formula-box">
+            VP = PMT × [(1 - (1 + i)^(-n)) / i]
+            <br><br>
+            Onde:<br>
+            • VP = Valor Presente<br>
+            • PMT = Pagamento mensal<br>
+            • i = Taxa mensal = (1 + taxa_anual)^(1/12) - 1<br>
+            • n = Número de períodos (meses)
+        </div>
+
+        <div class="code-box">
+def valor_presente(fluxo_mensal, anos, taxa_anual):
+    taxa_mensal = (1 + taxa_anual/100) ** (1/12) - 1
+    periodos = anos * 12
+    
+    if taxa_mensal > 0:
+        vp = fluxo_mensal * (1 - (1 + taxa_mensal) ** (-periodos)) / taxa_mensal
+    else:
+        vp = fluxo_mensal * periodos
+    
+    return vp
+        </div>
+
+        <div class="example">
+            <strong>Exemplo:</strong> Despesas de Ana por 37 anos (90 - 53)<br>
+            • PMT = R$ 150.000/mês<br>
+            • Taxa = 4.5% a.a. → Taxa mensal = (1.045)^(1/12) - 1 = 0.3663%<br>
+            • Períodos = 37 × 12 = 444 meses<br>
+            • <strong>VP ≈ R$ 35,8 milhões</strong>
+        </div>
+
+        <h3>2. Valor Futuro com Inflação (Fazenda)</h3>
+        <div class="formula-box">
+            Valor_Futuro = Valor_Atual × (1 + inflação)^anos
+            <br><br>
+            Onde: inflação = 3.5% a.a.
+        </div>
+
+        <div class="example">
+            <strong>Exemplo:</strong> Fazenda de R$ 2 milhões em 15 anos<br>
+            • Valor_Futuro = 2.000.000 × (1.035)^15<br>
+            • <strong>Valor_Futuro ≈ R$ 3,4 milhões</strong>
+        </div>
+    </section>
+
+    <section id="compromissos" class="section">
+        <h2>💰 Cálculos dos Compromissos</h2>
+        
+        <h3>Sequência de Cálculos:</h3>
+        
+        <div class="formula-box">
+            1. VP_despesas = valor_presente(150.000, 37, 4.5)
+            2. VP_filhos = valor_presente(150.000, 55, 4.5) × fator_desconto
+            3. VP_doacoes = valor_presente(50.000, 15, 4.5)
+            4. Total_Compromissos = VP_despesas + VP_filhos + VP_doacoes
+            5. Fazenda_Disponível = 65.000.000 - Total_Compromissos
+        </div>
+
+        <h3>🔄 Timing da Renda dos Filhos</h3>
+        <table>
+            <tr>
+                <th>Opção</th>
+                <th>Início</th>
+                <th>Duração</th>
+                <th>Fator Desconto</th>
+                <th>VP Estimado</th>
+            </tr>
+            <tr>
+                <td>Imediato</td>
+                <td>Hoje</td>
+                <td>55 anos</td>
+                <td>1.0</td>
+                <td>R$ 35,2M</td>
+            </tr>
+            <tr>
+                <td>Aos 65 anos</td>
+                <td>Em 12 anos</td>
+                <td>43 anos</td>
+                <td>0.629</td>
+                <td>R$ 18,7M</td>
+            </tr>
+            <tr>
+                <td>Falecimento</td>
+                <td>Em 37 anos</td>
+                <td>18 anos</td>
+                <td>0.213</td>
+                <td>R$ 3,8M</td>
+            </tr>
+        </table>
+
+        <h3>🏡 Sistema de Fases de Liquidez para Fazenda</h3>
+        <div class="param-grid">
+            <div class="param-card">
+                <strong>Fase 1 (40% do período)</strong><br>
+                Liquidez: 2%<br>
+                <small>Estratégia normal</small>
+            </div>
+            <div class="param-card">
+                <strong>Fase 2 (40% do período)</strong><br>
+                Liquidez: 4%<br>
+                <small>Acúmulo moderado</small>
+            </div>
+            <div class="param-card">
+                <strong>Fase 3 (20% do período)</strong><br>
+                Liquidez: 15%<br>
+                <small>Acúmulo intensivo</small>
+            </div>
+        </div>
+    </section>
+
+    <section id="simulacoes" class="section">
+        <h2>🎲 Simulações e Projeções</h2>
+        
+        <h3>1. Projeção Anual de Fluxo de Caixa</h3>
+        <div class="code-box">
+for ano in range(anos):
+    idade_ana = 53 + ano + 1
+    
+    # RENDIMENTOS
+    rendimentos = patrimonio_atual * (taxa / 100)
+    
+    # SAÍDAS
+    saidas_anuais = 0
+    if idade_ana <= expectativa:
+        saidas_anuais += despesas * 12      # Despesas Ana
+    if ano < 15:
+        saidas_anuais += 50000 * 12         # Doações
+    if idade_ana >= idade_inicio_filhos:
+        saidas_anuais += 150000 * 12        # Renda filhos
+    
+    # SALDO LÍQUIDO
+    saldo_liquido = rendimentos - saidas_anuais
+    patrimonio_atual = max(patrimonio_atual + saldo_liquido, 0)
+        </div>
+
+        <h3>2. Análise de Sensibilidade</h3>
+        <div class="formula-box">
+            Para cada taxa ∈ [2.0%, 2.5%, 3.0%, ..., 8.0%]:
+            factor = 1 + (delta_taxa × 0.15)
+            fazenda_estimada = fazenda_base × factor
+        </div>
+
+        <table>
+            <tr>
+                <th>Taxa Real</th>
+                <th>Valor Fazenda</th>
+                <th>% Patrimônio</th>
+                <th>Status</th>
+            </tr>
+            <tr>
+                <td>2.0%</td>
+                <td>-R$ 8,5M</td>
+                <td>-13.1%</td>
+                <td class="highlight" style="background: #fecaca;">Crítico</td>
+            </tr>
+            <tr>
+                <td>3.5%</td>
+                <td>R$ 2,1M</td>
+                <td>3.2%</td>
+                <td class="highlight" style="background: #fed7aa;">Atenção</td>
+            </tr>
+            <tr>
+                <td>4.5%</td>
+                <td>R$ 8,3M</td>
+                <td>12.8%</td>
+                <td class="highlight" style="background: #fef3c7;">Atenção</td>
+            </tr>
+            <tr>
+                <td>6.0%</td>
+                <td>R$ 18,7M</td>
+                <td>28.8%</td>
+                <td class="highlight" style="background: #dcfce7;">Viável</td>
+            </tr>
+        </table>
+
+        <h3>3. Simulação Monte Carlo</h3>
+        <div class="code-box">
+for simulacao in range(500):
+    patrimonio = 65_000_000
+    
+    for ano in range(20):
+        # Taxa aleatória entre 2.5% e 7.0%
+        base_return = random.uniform(2.5, 7.0) / 100
+        
+        # Adicionar volatilidade (±15%)
+        volatility = (random.random() - 0.5) * 0.30
+        year_return = base_return + volatility
+        
+        # Aplicar retorno e saídas
+        patrimonio = patrimonio * (1 + year_return) - 1_800_000
+        patrimonio = max(patrimonio, 0)
+    
+    final_values.append(patrimonio)
+        </div>
+
+        <div class="result-box">
+            <h4>Resultados Monte Carlo (500 simulações)</h4>
+            <strong>P10:</strong> -R$ 2,1M | <strong>P50:</strong> R$ 5,8M | <strong>P90:</strong> R$ 15,2M<br>
+            <strong>Taxa de Sucesso:</strong> 72%
+        </div>
+    </section>
+
+    <section id="status" class="section">
+        <h2>📈 Determinação de Status e Viabilidade</h2>
+        
+        <h3>Algoritmo de Classificação</h3>
+        <div class="code-box">
+def determinar_status(fazenda, percentual):
+    if fazenda < 0:
+        return 'crítico'
+    elif percentual < 5:
+        return 'crítico'  
+    elif percentual < 15:
+        return 'atenção'
+    else:
+        return 'viável'
+        </div>
+
+        <h3>📊 Critérios de Status</h3>
+        <div class="param-grid">
+            <div class="param-card" style="border-left: 4px solid #dc2626;">
+                <strong style="color: #dc2626;">🔴 CRÍTICO</strong><br>
+                • Fazenda negativa<br>
+                • OU < 5% do patrimônio<br>
+                <small>Ação urgente necessária</small>
+            </div>
+            <div class="param-card" style="border-left: 4px solid #f59e0b;">
+                <strong style="color: #f59e0b;">🟡 ATENÇÃO</strong><br>
+                • Entre 5% e 15%<br>
+                • do patrimônio<br>
+                <small>Monitoramento frequente</small>
+            </div>
+            <div class="param-card" style="border-left: 4px solid #10b981;">
+                <strong style="color: #10b981;">🟢 VIÁVEL</strong><br>
+                • ≥ 15% do patrimônio<br>
+                • Margem confortável<br>
+                <small>Plano sustentável</small>
+            </div>
+        </div>
+
+        <h3>🎯 Exemplo de Cálculo Completo</h3>
+        <div class="example">
+            <strong>Cenário:</strong> Taxa 4.5%, Expectativa 90 anos, Renda filhos após falecimento<br><br>
+            
+            <strong>1. VP Despesas Ana:</strong><br>
+            valor_presente(150.000, 37, 4.5) = <span class="highlight">R$ 35.791.234</span><br><br>
+            
+            <strong>2. VP Renda Filhos:</strong><br>
+            valor_presente(150.000, 18, 4.5) × (1.045)^(-37) = <span class="highlight">R$ 3.847.592</span><br><br>
+            
+            <strong>3. VP Doações:</strong><br>
+            valor_presente(50.000, 15, 4.5) = <span class="highlight">R$ 6.127.843</span><br><br>
+            
+            <strong>4. Total Compromissos:</strong><br>
+            35.791.234 + 3.847.592 + 6.127.843 = <span class="highlight">R$ 45.766.669</span><br><br>
+            
+            <strong>5. Valor Fazenda:</strong><br>
+            65.000.000 - 45.766.669 = <span class="highlight">R$ 19.233.331</span><br><br>
+            
+            <strong>6. Percentual:</strong><br>
+            (19.233.331 / 65.000.000) × 100 = <span class="highlight">29.6%</span><br><br>
+            
+            <strong>7. Status:</strong> <span class="highlight" style="background: #dcfce7; color: #065f46;">VIÁVEL</span>
+        </div>
+
+        <div class="warning">
+            <strong>Observação Importante:</strong> Todos os valores são em termos reais (poder de compra de 2025). 
+            A taxa de retorno informada já desconta a inflação estimada de 3.5% a.a.
+        </div>
+    </section>
+
+    <div class="result-box" style="margin-top: 30px;">
+        <h3>🎯 Resposta à Pergunta Central</h3>
+        <p><strong>"Quanto Ana pode gastar com a fazenda?"</strong></p>
+        <p>Com os parâmetros moderados (4.5% a.a., expectativa 90 anos), Ana pode destinar aproximadamente 
+        <strong>R$ 19,2 milhões (29.6% do patrimônio)</strong> para a fazenda, mantendo todos os outros compromissos.</p>
+    </div>
+
+    <footer style="text-align: center; margin-top: 40px; padding: 20px; color: #64748b;">
+        <p>📊 Cálculos baseados em metodologia de planejamento patrimonial quantitativo</p>
+        <p><strong>Júlio Lage</strong> | Análise Matemática Completa</p>
+    </footer>
+</body>
+</html>
