@@ -188,8 +188,9 @@ const PATRIMONIO = 65_000_000;  // R$ 65 milhões
             versao: apiData.versao,
             timestamp: apiData.timestamp,
             
-            // ✅ RESULTADO PRINCIPAL
+            // ✅ RESULTADO PRINCIPAL - CAMPOS CORRETOS
             resultado: {
+                // ✅ CAMPOS QUE EXISTEM NO BACKEND
                 fazenda: resultado.fazenda_disponivel,
                 fazenda_disponivel: resultado.fazenda_disponivel,
                 total: resultado.total_compromissos,
@@ -202,11 +203,11 @@ const PATRIMONIO = 65_000_000;  // R$ 65 milhões
                 arte: resultado.arte || 0,
                 percentual_arte: resultado.percentual_arte || 0,
                 
-                // ✅ NOVOS CAMPOS DA FAZENDA
-                fazenda_analysis: resultado.fazenda_analysis || {},
-                periodo_compra_fazenda: resultado.periodo_compra_fazenda,
-                valor_fazenda_atual: resultado.valor_fazenda_atual || 0,
-                valor_fazenda_futuro: resultado.valor_fazenda_futuro || 0
+                // ✅ CAMPOS DA FAZENDA (CORRIGIDOS)
+                fazenda_analysis: apiData.fazenda_analysis || {},
+                periodo_compra_fazenda: apiData.periodo_compra_fazenda || null,
+                valor_fazenda_atual: apiData.valor_fazenda_atual || 0,
+                valor_fazenda_futuro: apiData.valor_fazenda_futuro || 0
             },
             
             allocation: this.generateAllocationData(apiData.patrimonio),
@@ -215,7 +216,7 @@ const PATRIMONIO = 65_000_000;  // R$ 65 milhões
         };
     },
 
-    // Manter métodos existentes...
+    // ✅ MANTER MÉTODOS EXISTENTES SEM ALTERAÇÃO
     generateFallbackData() {
         debugMessage('Gerando dados de fallback', 'warning');
         return {
@@ -229,10 +230,12 @@ const PATRIMONIO = 65_000_000;  // R$ 65 milhões
                 valor_fazenda_atual: 0, valor_fazenda_futuro: 0
             },
             allocation: this.generateAllocationData(65000000),
-            sensibilidade: [], status: 'erro'
+            sensibilidade: [], 
+            status: 'erro'
         };
     },
 
+    // ✅ MANTER DEMAIS MÉTODOS INALTERADOS...
     generateAllocationData(patrimonio) {
         const perfil = document.getElementById('perfilInvestimento')?.value || 'moderado';
         
@@ -2115,59 +2118,111 @@ ChartManager.createAllocationEvolutionChart = function() {
         });
     }
 
-    const FazendaManager = {
-    // Calcular valor futuro da fazenda
-    calcularValorFuturo(valorAtual, anos) {
-        if (anos <= 0) return valorAtual;
-        return valorAtual * Math.pow(1 + CONFIG.INFLACAO_ESTATICA / 100, anos);
-    },
 
-    // Atualizar informações da fazenda na UI
-    updateFazendaInfo() {
-        const periodo = parseInt(document.getElementById('periodoCompraFazenda').value) || 0;
-        const valorAtual = parseFloat(document.getElementById('valorFazendaAtual').value) || 0;
+const FazendaManager = {
+   
+
+    updateFazendaCard(dadosFazenda) {
+        if (!dadosFazenda) {
+            console.warn('⚠️ Dados da fazenda não disponíveis');
+            return;
+        }
+
+        console.log('🏡 Atualizando card da fazenda:', dadosFazenda);
+
+        // ✅ VALOR DISPONÍVEL (PRINCIPAL)
+        const valorEl = document.getElementById('valorFazenda');
+        if (valorEl) {
+            const valorDisponivel = dadosFazenda.fazenda_disponivel || 0;
+            valorEl.textContent = Utils.formatCurrency(valorDisponivel, true);
+        }
+
+        // ✅ PERÍODO DE COMPRA
+        const periodoEl = document.getElementById('periodoFazendaDisplay');
+        if (periodoEl) {
+            const periodo = parseInt(document.getElementById('periodoCompraFazenda')?.value || 0);
+            if (periodo && periodo > 0) {
+                periodoEl.textContent = `Em ${periodo} anos`;
+            } else {
+                periodoEl.textContent = 'Compra imediata';
+            }
+        }
+
+        // ✅ VALORES DE COMPARAÇÃO (CORRIGIDOS)
+        const necessarioEl = document.getElementById('fazendaNecessario');
+        const disponivelEl = document.getElementById('fazendaDisponivel');
         
-        // Atualizar texto do valor futuro
-        if (periodo > 0) {
-            const valorFuturo = this.calcularValorFuturo(valorAtual, periodo);
-            const futuroEl = document.getElementById('valorFazendaFuturo');
-            if (futuroEl) {
-                futuroEl.textContent = `≈ ${Utils.formatCurrency(valorFuturo, true)} em ${periodo} anos (inflação ${CONFIG.INFLACAO_ESTATICA}%)`;
-            }
-        } else {
-            const futuroEl = document.getElementById('valorFazendaFuturo');
-            if (futuroEl) {
-                futuroEl.textContent = 'Compra imediata (sem ajuste de inflação)';
-            }
-        }
-
-        // Atualizar seção de informações
-        this.updateFazendaInfoSection(periodo, valorAtual);
-    },
-
-    updateFazendaInfoSection(periodo, valorAtual) {
-        const infoEl = document.getElementById('fazendaInfoContent');
-        if (!infoEl) return;
-
-        if (periodo === 0) {
-            infoEl.innerHTML = `
-                <strong>Compra Imediata:</strong> R$ ${Utils.formatCurrency(valorAtual, true)}<br>
-                <em>Impacto: Redução imediata do patrimônio, sem período de acumulação</em>
-            `;
-        } else {
-            const valorFuturo = this.calcularValorFuturo(valorAtual, periodo);
-            const fases = this.calcularFases(periodo);
+        if (necessarioEl) {
+            // ✅ USAR O VALOR ATUAL DA FAZENDA (DO INPUT)
+            const valorFazendaAtual = parseFloat(document.getElementById('valorFazendaAtual')?.value || 0);
+            const periodo = parseInt(document.getElementById('periodoCompraFazenda')?.value || 0);
             
-            infoEl.innerHTML = `
-                <strong>Compra em ${periodo} anos:</strong><br>
-                • Valor hoje: ${Utils.formatCurrency(valorAtual, true)}<br>
-                • Valor futuro: ${Utils.formatCurrency(valorFuturo, true)} (c/ inflação)<br>
-                • Estratégia: Liquidez gradual em ${fases.length} fases<br>
-                <em>Liquidez final: ${fases[fases.length - 1]?.liquidez || 15}% antes da compra</em>
-            `;
+            let valorNecessario = valorFazendaAtual;
+            if (periodo > 0) {
+                // Calcular valor futuro com inflação de 3.5%
+                valorNecessario = valorFazendaAtual * Math.pow(1.035, periodo);
+            }
+            
+            necessarioEl.textContent = Utils.formatCurrency(valorNecessario, true);
         }
+        
+        if (disponivelEl) {
+            const valorDisponivel = dadosFazenda.fazenda_disponivel || 0;
+            disponivelEl.textContent = Utils.formatCurrency(valorDisponivel, true);
+        }
+
+        // ✅ STATUS DA FAZENDA
+        const statusEl = document.getElementById('fazendaStatus');
+        if (statusEl) {
+            const valorDisponivel = dadosFazenda.fazenda_disponivel || 0;
+            const valorFazendaAtual = parseFloat(document.getElementById('valorFazendaAtual')?.value || 0);
+            
+            if (valorDisponivel >= valorFazendaAtual) {
+                statusEl.innerHTML = '<span class="status-badge success">✅ Viável</span>';
+            } else {
+                statusEl.innerHTML = '<span class="status-badge danger">❌ Inviável</span>';
+            }
+        }
+
+        debugMessage('✅ Card da fazenda atualizado com valores corretos');
     },
 
+    // ✅ MÉTODO CORRIGIDO PARA ATUALIZAR INFORMAÇÕES
+    updateFazendaInfo() {
+        const periodo = parseInt(document.getElementById('periodoCompraFazenda')?.value || 0);
+        const valorAtual = parseFloat(document.getElementById('valorFazendaAtual')?.value || 0);
+        
+        // ✅ CALCULAR VALOR FUTURO CORRETAMENTE
+        let valorFuturo = valorAtual;
+        if (periodo > 0) {
+            valorFuturo = valorAtual * Math.pow(1.035, periodo); // 3.5% inflação
+        }
+        
+        // ✅ ATUALIZAR SEÇÃO DE INFORMAÇÕES
+        const infoEl = document.getElementById('fazendaInfoContent');
+        if (infoEl) {
+            if (periodo === 0) {
+                infoEl.innerHTML = `
+                    <strong>Compra Imediata:</strong> ${Utils.formatCurrency(valorAtual, true)}<br>
+                    <em>Impacto: Redução imediata do patrimônio, sem período de acumulação</em>
+                `;
+            } else {
+                const fases = this.calcularFases(periodo);
+                
+                infoEl.innerHTML = `
+                    <strong>Compra em ${periodo} anos:</strong><br>
+                    • Valor hoje: ${Utils.formatCurrency(valorAtual, true)}<br>
+                    • Valor futuro: ${Utils.formatCurrency(valorFuturo, true)} (c/ inflação)<br>
+                    • Estratégia: Liquidez gradual em ${fases.length} fases<br>
+                    <em>Liquidez final: ${fases[fases.length - 1]?.liquidez || 15}% antes da compra</em>
+                `;
+            }
+        }
+
+        debugMessage(`🏡 Info atualizada: ${Utils.formatCurrency(valorAtual, true)} → ${Utils.formatCurrency(valorFuturo, true)} em ${periodo} anos`);
+    },
+
+    // ✅ MANTER MÉTODOS EXISTENTES
     calcularFases(periodo) {
         if (periodo <= 0) return [];
         
@@ -2182,55 +2237,11 @@ ChartManager.createAllocationEvolutionChart = function() {
         ];
     },
 
-    // Atualizar card de fazenda no dashboard
-    updateFazendaCard(dadosFazenda) {
-        if (!dadosFazenda) return;
-
-        // Valor disponível
-        const valorEl = document.getElementById('valorFazenda');
-        if (valorEl) {
-            valorEl.textContent = Utils.formatCurrency(dadosFazenda.fazenda_disponivel, true);
-        }
-
-        // Período
-        const periodoEl = document.getElementById('periodoFazendaDisplay');
-        if (periodoEl) {
-            const periodo = dadosFazenda.periodo_compra_fazenda;
-            if (periodo && periodo > 0) {
-                periodoEl.textContent = `Em ${periodo} anos`;
-            } else {
-                periodoEl.textContent = 'Compra imediata';
-            }
-        }
-
-        // Comparação necessário vs disponível
-        const necessarioEl = document.getElementById('fazendaNecessario');
-        const disponivelEl = document.getElementById('fazendaDisponivel');
-        
-        if (necessarioEl) {
-            necessarioEl.textContent = Utils.formatCurrency(dadosFazenda.valor_fazenda_futuro || dadosFazenda.valor_fazenda_atual, true);
-        }
-        
-        if (disponivelEl) {
-            disponivelEl.textContent = Utils.formatCurrency(dadosFazenda.fazenda_disponivel, true);
-        }
-
-        // Status
-        const statusEl = document.getElementById('fazendaStatus');
-        if (statusEl) {
-            const analysis = dadosFazenda.fazenda_analysis || {};
-            
-            if (analysis.viavel) {
-                statusEl.innerHTML = '<span class="status-badge success">✅ Viável</span>';
-            } else {
-                statusEl.innerHTML = '<span class="status-badge danger">❌ Inviável</span>';
-            }
-        }
-
-        debugMessage('Card da fazenda atualizado');
+    calcularValorFuturo(valorAtual, anos) {
+        if (anos <= 0) return valorAtual;
+        return valorAtual * Math.pow(1.035, anos); // 3.5% inflação anual
     },
 
-    // Criar timeline das fases
     createFazendaTimeline(periodo) {
         const timelineEl = document.getElementById('fazendaTimeline');
         if (!timelineEl || periodo <= 0) {
@@ -2867,97 +2878,7 @@ window.ProjectionsManager.updateProjectionSummaryFixed = async function() {
     },
 
     // Atualizar método existente updateMetrics para incluir fazenda
-    updateMetrics() {
-        if (!AppState.currentData) return;
-        
-        debugMessage('Atualizando métricas sincronizadas v4.3');
-        const { resultado, patrimonio, status } = AppState.currentData;
-        
-        // Métricas existentes...
-        const patrimonioEl = document.getElementById('valorPatrimonio');
-        if (patrimonioEl) {
-            patrimonioEl.textContent = Utils.formatCurrency(patrimonio, true);
-        }
-        
-        const fazendaEl = document.getElementById('valorFazenda');
-        const percentualEl = document.getElementById('percentualFazenda');
-        const trendEl = document.getElementById('trendFazenda');
-        
-        if (fazendaEl && resultado) {
-            fazendaEl.textContent = Utils.formatCurrency(resultado.fazenda, true);
-            if (percentualEl) {
-                percentualEl.textContent = Utils.formatPercentage(resultado.percentual);
-            }
-            
-            if (trendEl) {
-                trendEl.className = 'metric-trend';
-                if (resultado.fazenda > 0) {
-                    trendEl.classList.add('positive');
-                    trendEl.innerHTML = '<i class="fas fa-arrow-up"></i><span>' + Utils.formatPercentage(resultado.percentual) + '</span>';
-                } else {
-                    trendEl.classList.add('negative');
-                    trendEl.innerHTML = '<i class="fas fa-arrow-down"></i><span>' + Utils.formatPercentage(resultado.percentual) + '</span>';
-                }
-            }
-        }
-        
-        // ✅ NOVA: Atualizar métricas específicas da fazenda
-        this.updateFazendaMetrics(resultado);
-        
-        // Métricas restantes (arte, perfil, etc.) - manter código existente
-        const arteEl = document.getElementById('valorArte');
-        const percentualArteEl = document.getElementById('percentualArte');
-        const trendArteEl = document.getElementById('trendArte');
-        
-        if (arteEl && resultado) {
-            arteEl.textContent = Utils.formatCurrency(resultado.arte || 0, true);
-            if (percentualArteEl) {
-                percentualArteEl.textContent = Utils.formatPercentage(resultado.percentual_arte || 0);
-            }
-            
-            if (trendArteEl) {
-                trendArteEl.className = 'metric-trend';
-                if (resultado.arte > 0) {
-                    trendArteEl.classList.add('positive');
-                    trendArteEl.innerHTML = '<i class="fas fa-palette"></i><span>' + Utils.formatPercentage(resultado.percentual_arte || 0) + '</span>';
-                } else {
-                    trendArteEl.classList.add('neutral');
-                    trendArteEl.innerHTML = '<i class="fas fa-palette"></i><span>Indisponível</span>';
-                }
-            }
-        }
-        
-        const perfilEl = document.getElementById('perfilAtual');
-        const retornoEl = document.getElementById('retornoEsperado');
-        
-        if (perfilEl) {
-            const perfil = document.getElementById('perfilInvestimento')?.value || 'moderado';
-            perfilEl.textContent = perfil.charAt(0).toUpperCase() + perfil.slice(1);
-            
-            const retornos = {
-                'conservador': '3.5% a.a.',
-                'moderado': '4.5% a.a.',
-                'balanceado': '5.2% a.a.'
-            };
-            if (retornoEl) {
-                retornoEl.textContent = retornos[perfil] || '4.5% a.a.';
-            }
-        }
-        
-        const compromissosEl = document.getElementById('valorCompromissos');
-        if (compromissosEl && resultado) {
-            compromissosEl.textContent = Utils.formatCurrency(resultado.total, true);
-        }
-        
-        this.updateStatusVisual(status);
-        
-        const statusEl = document.getElementById('valorStatus');
-        if (statusEl) {
-            statusEl.textContent = status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Calculando...';
-        }
-
-        debugMessage('✅ Métricas v4.3 atualizadas incluindo fazenda');
-    },
+    
 
     // Manter outros métodos existentes (updateStatusVisual, updateAlerts, etc.)
     updateStatusVisual(status) {
@@ -3112,6 +3033,134 @@ window.ProjectionsManager.updateProjectionSummaryFixed = async function() {
             }
         }
     }
+};
+
+UIManager.updateMetrics = function() {
+    if (!AppState.currentData) {
+        debugMessage('⚠️ Dados não disponíveis para updateMetrics');
+        return;
+    }
+    
+    debugMessage('🔄 Atualizando métricas sincronizadas v4.4');
+    const { resultado, patrimonio, status } = AppState.currentData;
+    
+    // ✅ 1. PATRIMÔNIO TOTAL
+    const patrimonioEl = document.getElementById('valorPatrimonio');
+    if (patrimonioEl) {
+        patrimonioEl.textContent = Utils.formatCurrency(patrimonio, true);
+    }
+    
+    // ✅ 2. FAZENDA (PRINCIPAL CORREÇÃO)
+    const fazendaEl = document.getElementById('valorFazenda');
+    const percentualEl = document.getElementById('percentualFazenda');
+    const trendEl = document.getElementById('trendFazenda');
+    
+    if (fazendaEl && resultado) {
+        // Usar fazenda_disponivel (campo correto)
+        const valorFazenda = resultado.fazenda_disponivel || resultado.fazenda || 0;
+        fazendaEl.textContent = Utils.formatCurrency(valorFazenda, true);
+        
+        if (percentualEl) {
+            const percentual = resultado.percentual_fazenda || resultado.percentual || 0;
+            percentualEl.textContent = Utils.formatPercentage(percentual);
+        }
+        
+        if (trendEl) {
+            trendEl.className = 'metric-trend';
+            if (valorFazenda > 0) {
+                trendEl.classList.add('positive');
+                const periodo = document.getElementById('periodoCompraFazenda')?.value || 0;
+                const periodoTexto = periodo > 0 ? `Em ${periodo} anos` : 'Compra imediata';
+                trendEl.innerHTML = `<i class="fas fa-calendar"></i><span>${periodoTexto}</span>`;
+            } else {
+                trendEl.classList.add('negative');
+                trendEl.innerHTML = '<i class="fas fa-exclamation-triangle"></i><span>Inviável</span>';
+            }
+        }
+    }
+    
+    // ✅ 3. ATUALIZAR CARD DA FAZENDA COM DADOS COMPLETOS
+    try {
+        const dadosFazenda = {
+            fazenda_disponivel: resultado.fazenda_disponivel || resultado.fazenda || 0,
+            percentual_fazenda: resultado.percentual_fazenda || resultado.percentual || 0,
+            fazenda_analysis: AppState.currentData.fazenda_analysis || {},
+            periodo_compra_fazenda: AppState.currentData.periodo_compra_fazenda,
+            valor_fazenda_atual: AppState.currentData.valor_fazenda_atual || 0,
+            valor_fazenda_futuro: AppState.currentData.valor_fazenda_futuro || 0
+        };
+        
+        FazendaManager.updateFazendaCard(dadosFazenda);
+        debugMessage('✅ Card da fazenda atualizado');
+    } catch (error) {
+        debugMessage(`⚠️ Erro ao atualizar card da fazenda: ${error.message}`, 'warning');
+    }
+    
+    // ✅ 4. ARTE/GALERIA
+    const arteEl = document.getElementById('valorArte');
+    const percentualArteEl = document.getElementById('percentualArte');
+    const trendArteEl = document.getElementById('trendArte');
+    
+    if (arteEl && resultado) {
+        const valorArte = resultado.arte || 0;
+        arteEl.textContent = Utils.formatCurrency(valorArte, true);
+        
+        if (percentualArteEl) {
+            percentualArteEl.textContent = Utils.formatPercentage(resultado.percentual_arte || 0);
+        }
+        
+        if (trendArteEl) {
+            trendArteEl.className = 'metric-trend';
+            if (valorArte > 0) {
+                trendArteEl.classList.add('positive');
+                trendArteEl.innerHTML = `<i class="fas fa-palette"></i><span>${Utils.formatPercentage(resultado.percentual_arte || 0)}</span>`;
+            } else {
+                trendArteEl.classList.add('neutral');
+                trendArteEl.innerHTML = '<i class="fas fa-palette"></i><span>Indisponível</span>';
+            }
+        }
+    }
+    
+    // ✅ 5. PERFIL DE INVESTIMENTO
+    const perfilEl = document.getElementById('perfilAtual');
+    const retornoEl = document.getElementById('retornoEsperado');
+    
+    if (perfilEl) {
+        const perfil = document.getElementById('perfilInvestimento')?.value || 'moderado';
+        perfilEl.textContent = perfil.charAt(0).toUpperCase() + perfil.slice(1);
+        
+        const retornos = {
+            'conservador': '3.5% a.a.',
+            'moderado': '4.5% a.a.',
+            'balanceado': '5.2% a.a.'
+        };
+        if (retornoEl) {
+            retornoEl.textContent = retornos[perfil] || '4.5% a.a.';
+        }
+    }
+    
+    // ✅ 6. COMPROMISSOS TOTAIS
+    const compromissosEl = document.getElementById('valorCompromissos');
+    if (compromissosEl && resultado) {
+        const totalCompromissos = resultado.total_compromissos || resultado.total || 0;
+        compromissosEl.textContent = Utils.formatCurrency(totalCompromissos, true);
+    }
+    
+    // ✅ 7. STATUS DO PLANO
+    this.updateStatusVisual(status);
+    
+    const statusEl = document.getElementById('valorStatus');
+    if (statusEl) {
+        if (status === 'crítico') {
+            statusEl.innerHTML = '⚠️ Crítico';
+        } else if (status === 'atenção') {
+            statusEl.innerHTML = '⚡ Atenção';
+        } else {
+            statusEl.innerHTML = '✅ Viável';
+        }
+    }
+
+    debugMessage('✅ Métricas v4.4 atualizadas incluindo fazenda');
 };
 
     // ================ FUNÇÕES GLOBAIS ================ 
@@ -3914,6 +3963,17 @@ function updateAllocationTableCorrected() {
         document.getElementById('simVolatilidade').addEventListener('input', (e) => {
             document.getElementById('simVolatilidadeDisplay').textContent = e.target.value + '%';
         });
+        document.getElementById('periodoCompraFazenda').addEventListener('input', (e) => {
+        debugMessage(`🏡 Período alterado: ${e.target.value} anos`);
+        FazendaManager.updateFazendaInfo();
+        debouncedUpdate();
+         });
+
+    document.getElementById('valorFazendaAtual').addEventListener('input', (e) => {
+        debugMessage(`💰 Valor alterado: R$ ${parseFloat(e.target.value || 0).toLocaleString('pt-BR')}`);
+        FazendaManager.updateFazendaInfo();
+        debouncedUpdate();
+        });
 
         // ✅ NOVOS EVENTOS: Checkboxes da allocation
         ['showRendaFixaBR', 'showRendaFixaInt', 'showAcoesBR', 'showAcoesInt', 'showImoveis', 'showLiquidez'].forEach(id => {
@@ -3965,18 +4025,18 @@ function updateAllocationTableCorrected() {
                 }
             }, 300);
             
-            Utils.showNotification('Dashboard v4.3 atualizado com sucesso!', 'success');
+            Utils.showNotification('Dashboard atualizado com sucesso!', 'success');
             
         } catch (error) {
-            debugMessage(`Erro ao carregar dashboard v4.3: ${error.message}`, 'error');
-            Utils.showNotification(`Erro ao carregar dados v4.3: ${error.message}`, 'danger');
+            debugMessage(`Erro ao carregar dashboard : ${error.message}`, 'error');
+            Utils.showNotification(`Erro ao carregar dados : ${error.message}`, 'danger');
             
             const container = document.getElementById('alertContainer');
             if (container) {
                 container.innerHTML = `
                     <div class="alert danger">
                         <i class="fas fa-exclamation-triangle"></i>
-                        <strong>Erro de Conexão v4.3:</strong> Não foi possível carregar os dados do servidor. 
+                        <strong>Erro de Conexão :</strong> Não foi possível carregar os dados do servidor. 
                         Verifique se o backend Flask está rodando em http://localhost:5000
                     </div>
                 `;

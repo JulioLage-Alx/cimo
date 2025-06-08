@@ -2606,11 +2606,15 @@ def dashboard():
         <p><a href="/">← Voltar</a></p>
         ''', 500
 
+
+# ================ CORREÇÃO DA API /api/dados ================
+# SUBSTITUIR a função api_dados_v43 em app.py
+
 @app.route('/api/dados')
 def api_dados_v43():
-    """API principal - VERSÃO v4.3 COM FAZENDA"""
+    """API principal - VERSÃO v4.3 COM FAZENDA CORRIGIDA"""
     try:
-        # Parâmetros
+        # ✅ COLETAR PARÂMETROS (INCLUINDO FAZENDA)
         taxa = float(request.args.get('taxa', 4.0))
         expectativa = int(request.args.get('expectativa', 90))
         despesas = float(request.args.get('despesas', 150000))
@@ -2618,6 +2622,7 @@ def api_dados_v43():
         custo_fazenda = float(request.args.get('custo_fazenda', 2_000_000))
         perfil_investimento = request.args.get('perfil', 'moderado')
         
+        # ✅ NOVO: Período de compra da fazenda
         periodo_compra_fazenda = request.args.get('periodo_compra_fazenda')
         if periodo_compra_fazenda:
             try:
@@ -2627,23 +2632,34 @@ def api_dados_v43():
             except:
                 periodo_compra_fazenda = None
         
-        print(f"📥 API v4.4 - CORREÇÃO RENDA FILHOS:")
-        print(f"   Taxa: {taxa}%, Início filhos: {inicio_renda_filhos}")
+        print(f"📥 API v4.4 - FAZENDA CORRIGIDA:")
+        print(f"   Taxa: {taxa}%, Fazenda: {custo_fazenda:,.0f}, Período: {periodo_compra_fazenda or 'imediato'}")
         
-        # USAR FUNÇÃO v4.4 CORRIGIDA
-        resultado = calcular_compromissos_v42_corrigido(
-            taxa, expectativa, despesas, inicio_renda_filhos, 
-            custo_fazenda, perfil_investimento
-        )
+        # ✅ USAR FUNÇÃO v4.3 COM FAZENDA SE PERÍODO ESPECIFICADO
+        if periodo_compra_fazenda:
+            resultado = calcular_compromissos_v43_com_fazenda(
+                taxa, expectativa, despesas, inicio_renda_filhos, 
+                custo_fazenda, perfil_investimento, periodo_compra_fazenda
+            )
+        else:
+            # Usar função v4.2 original para compra imediata
+            resultado = calcular_compromissos_v42_corrigido(
+                taxa, expectativa, despesas, inicio_renda_filhos, 
+                custo_fazenda, perfil_investimento
+            )
         
+        # ✅ DETERMINAR STATUS
         status = determinar_status(resultado['fazenda_disponivel'], resultado['percentual_fazenda'])
         
-        # Asset allocation
+        # ✅ ASSET ALLOCATION
         allocation = get_asset_allocation(perfil_investimento, PATRIMONIO)
         
+        # ✅ RESPONSE COM TODOS OS DADOS NECESSÁRIOS
         response_data = {
             'success': True,
             'patrimonio': PATRIMONIO,
+            
+            # ✅ RESULTADO PRINCIPAL
             'resultado': {
                 'fazenda_disponivel': resultado['fazenda_disponivel'],
                 'total_compromissos': resultado['total_compromissos'],
@@ -2654,24 +2670,38 @@ def api_dados_v43():
                 'arte': resultado['arte'],
                 'percentual_arte': resultado['percentual_arte']
             },
+            
+            # ✅ DADOS DA FAZENDA (SE EXISTIREM)
+            'fazenda_analysis': resultado.get('fazenda_analysis', {}),
+            'periodo_compra_fazenda': resultado.get('periodo_compra_fazenda'),
+            'valor_fazenda_atual': resultado.get('valor_fazenda_atual', custo_fazenda),
+            'valor_fazenda_futuro': resultado.get('valor_fazenda_futuro', custo_fazenda),
+            
+            # ✅ DEMAIS DADOS
             'allocation': allocation,
             'status': status,
-            'versao': '4.4-RENDA-FILHOS-CORRIGIDA',
+            'versao': '4.4-FAZENDA-CORRIGIDA',
             'timestamp': get_current_datetime_sao_paulo().isoformat()
         }
         
-        print(f"✅ v4.4 CORRIGIDA - Renda filhos: {format_currency(resultado['filhos'], True)}")
+        print(f"   Status: {status}, Período: {periodo_compra_fazenda or 'imediato'}")
         
         return jsonify(response_data)
         
     except Exception as e:
         print(f"❌ Erro na API v4.4: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        
         return jsonify({
             'success': False,
             'erro': str(e),
-            'versao': '4.4-RENDA-FILHOS-CORRIGIDA',
+            'versao': '4.4-FAZENDA-CORRIGIDA',
             'timestamp': get_current_datetime_sao_paulo().isoformat()
         }), 500
+
+
+
 
 @app.route('/api/teste')
 def api_teste():
@@ -2709,6 +2739,9 @@ def api_teste():
     })
 
 # ================ EXEMPLO DE TESTE COM LOGO ================
+# ================ CORREÇÃO NO /api/teste-correcoes ================
+# LINHA ~1400 em app.py
+
 @app.route('/api/teste-correcoes')
 def teste_correcoes():
     """Endpoint para testar as correções implementadas"""
@@ -2742,18 +2775,18 @@ def teste_correcoes():
                     'perfil': 'moderado'
                 },
                 'resultados_corrigidos': {
-                'patrimonio_disponivel': format_currency(resultado_original['patrimonio_disponivel']),  # ✅ Corrigido
-                'patrimonio_total': format_currency(resultado_original['patrimonio_total']),           # ✅ Corrigido
-                'vp_despesas_ana': format_currency(resultado_original['despesas']),
-                'vp_renda_filhos_vitalicia': format_currency(resultado_original['filhos']),
-                'anos_renda_filhos': resultado_original['anos_renda_filhos'],
-                'vp_doacoes': format_currency(resultado_original['doacoes']),
-                'total_compromissos': format_currency(resultado_original['total_compromissos']),
-                'valor_fazenda': format_currency(resultado_original['fazenda_disponivel']),
-                'percentual_fazenda': f"{resultado_original['percentual_fazenda']:.1f}%",
-                'valor_arte': format_currency(resultado_original['arte']),
-                'status': status
-            },
+                    'patrimonio_disponivel': format_currency(resultado_original['patrimonio_disponivel']),
+                    'patrimonio_total': format_currency(resultado_original['patrimonio_total']),
+                    'vp_despesas_ana': format_currency(resultado_original['despesas']),
+                    'vp_renda_filhos_vitalicia': format_currency(resultado_original['filhos']),
+                    # ✅ REMOVIDO: 'anos_renda_filhos': resultado_original['anos_renda_filhos'],
+                    'vp_doacoes': format_currency(resultado_original['doacoes']),
+                    'total_compromissos': format_currency(resultado_original['total_compromissos']),
+                    'valor_fazenda': format_currency(resultado_original['fazenda_disponivel']),
+                    'percentual_fazenda': f"{resultado_original['percentual_fazenda']:.1f}%",
+                    'valor_arte': format_currency(resultado_original['arte']),
+                    'status': status
+                },
                 'analise': {
                     'plano_viavel': status == 'viável',
                     'requer_ajustes': status in ['crítico', 'atenção'],
